@@ -1,0 +1,14 @@
+# Global owners - all changes require review
+* @mikejamescalvert
+
+# Trading logic and strategy changes require extra scrutiny
+src/financial_agent/strategy/ @mikejamescalvert
+src/financial_agent/broker/ @mikejamescalvert
+src/financial_agent/analysis/ @mikejamescalvert
+src/financial_agent/main.py @mikejamescalvert
+
+# Workflow changes require owner review
+.github/workflows/ @mikejamescalvert
+
+# Config changes
+src/financial_agent/config.py @mikejamescalvert

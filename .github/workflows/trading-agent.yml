@@ -1,0 +1,91 @@
+name: Trading Agent
+
+on:
+  schedule:
+    # Every 30 minutes during US market hours (9:30 AM - 4:00 PM ET)
+    # UTC is ET + 5 (EST) or ET + 4 (EDT)
+    # Covers both EST and EDT with a wider window
+    - cron: '*/30 13-21 * * 1-5'  # Mon-Fri, 1:30 PM - 9:30 PM UTC
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run in dry-run mode (no real trades)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      strategy:
+        description: 'Trading strategy override'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - 'balanced'
+          - 'conservative'
+          - 'momentum'
+
+concurrency:
+  group: trading-agent
+  cancel-in-progress: false  # Never cancel a running trading cycle
+
+permissions:
+  contents: read
+
+jobs:
+  trade:
+    name: Analyze & Trade
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Only run on the main branch
+    if: github.ref == 'refs/heads/main'
+
+    environment: trading
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run trading agent
+        id: agent
+        env:
+          # Secrets (from GitHub Secrets)
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Configuration (from GitHub Variables)
+          ALPACA_BASE_URL: ${{ vars.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets' }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514' }}
+          TRADING_MAX_POSITION_PCT: ${{ vars.TRADING_MAX_POSITION_PCT || '0.10' }}
+          TRADING_MAX_DAILY_TRADES: ${{ vars.TRADING_MAX_DAILY_TRADES || '10' }}
+          TRADING_STOP_LOSS_PCT: ${{ vars.TRADING_STOP_LOSS_PCT || '0.05' }}
+          TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.15' }}
+          TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.10' }}
+          TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ' }}
+          TRADING_STRATEGY: ${{ inputs.strategy || vars.TRADING_STRATEGY || 'balanced' }}
+          TRADING_DRY_RUN: ${{ inputs.dry_run || vars.TRADING_DRY_RUN || 'true' }}
+          LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
+        run: python -m financial_agent.main
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## Trading Agent Run" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strategy:** ${{ inputs.strategy || vars.TRADING_STRATEGY || 'balanced' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry Run:** ${{ inputs.dry_run || vars.TRADING_DRY_RUN || 'true' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
