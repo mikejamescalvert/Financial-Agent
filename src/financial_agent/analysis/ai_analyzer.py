@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import anthropic
 import structlog
 
-from financial_agent.portfolio.models import SignalType, TradeSignal
+from financial_agent.portfolio.models import AssetClass, SignalType, TradeSignal
 
 if TYPE_CHECKING:
     from financial_agent.config import AIConfig, TradingConfig
@@ -18,7 +18,8 @@ log = structlog.get_logger()
 
 SYSTEM_PROMPT = """\
 You are an expert quantitative trading analyst. Your job is to analyze portfolio data \
-and technical indicators to produce actionable trading signals.
+and technical indicators to produce actionable trading signals for both stocks and \
+cryptocurrencies.
 
 Rules:
 - Be conservative with confidence scores. Only use >0.8 for very strong signals.
@@ -28,6 +29,13 @@ Rules:
 - If indicators are mixed or unclear, recommend HOLD.
 - Never recommend more than 3 BUY signals at once to avoid over-trading.
 - Consider the current strategy mode when making recommendations.
+
+Crypto-specific rules:
+- Crypto symbols contain "/" (e.g., BTC/USD, ETH/USD). Stock symbols do not.
+- Crypto trades 24/7 — there is no market close.
+- Crypto is more volatile than stocks — use wider stop losses (8-15% vs 3-5%).
+- Treat crypto and stock allocations as separate buckets for diversification.
+- Be especially cautious with altcoins; prefer BTC and ETH for larger positions.
 
 Respond ONLY with valid JSON matching this schema:
 {
@@ -145,15 +153,18 @@ Analyze the above data and provide your trading signals as JSON.
         signals: list[TradeSignal] = []
         for entry in data.get("signals", []):
             try:
+                symbol = entry["symbol"]
+                asset_cls = AssetClass.CRYPTO if "/" in symbol else AssetClass.US_EQUITY
                 signals.append(
                     TradeSignal(
-                        symbol=entry["symbol"],
+                        symbol=symbol,
                         signal=SignalType(entry["signal"]),
                         confidence=float(entry["confidence"]),
                         reason=entry["reason"],
                         target_weight=entry.get("target_weight"),
                         stop_loss=entry.get("stop_loss"),
                         take_profit=entry.get("take_profit"),
+                        asset_class=asset_cls,
                     )
                 )
             except (KeyError, ValueError) as e:

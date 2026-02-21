@@ -8,8 +8,13 @@ from enum import StrEnum
 from pydantic import BaseModel, Field
 
 
+class AssetClass(StrEnum):
+    US_EQUITY = "us_equity"
+    CRYPTO = "crypto"
+
+
 class Position(BaseModel):
-    """A single stock position."""
+    """A single position (stock or crypto)."""
 
     symbol: str
     qty: float
@@ -19,6 +24,7 @@ class Position(BaseModel):
     unrealized_pl: float
     unrealized_pl_pct: float
     side: str = "long"
+    asset_class: AssetClass = AssetClass.US_EQUITY
 
 
 class PortfolioSnapshot(BaseModel):
@@ -51,6 +57,14 @@ class PortfolioSnapshot(BaseModel):
             return 0.0
         return pos.market_value / self.equity
 
+    def stock_positions(self) -> list[Position]:
+        """Return only US equity positions."""
+        return [p for p in self.positions if p.asset_class == AssetClass.US_EQUITY]
+
+    def crypto_positions(self) -> list[Position]:
+        """Return only crypto positions."""
+        return [p for p in self.positions if p.asset_class == AssetClass.CRYPTO]
+
 
 class SignalType(StrEnum):
     BUY = "buy"
@@ -68,6 +82,7 @@ class TradeSignal(BaseModel):
     target_weight: float | None = None
     stop_loss: float | None = None
     take_profit: float | None = None
+    asset_class: AssetClass = AssetClass.US_EQUITY
 
 
 class TradeOrder(BaseModel):
@@ -78,3 +93,4 @@ class TradeOrder(BaseModel):
     qty: float
     reason: str
     signal_confidence: float = 0.0
+    asset_class: AssetClass = AssetClass.US_EQUITY

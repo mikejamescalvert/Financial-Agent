@@ -1,7 +1,7 @@
 """Tests for AI analyzer response parsing."""
 
 from financial_agent.analysis.ai_analyzer import AIAnalyzer
-from financial_agent.portfolio.models import SignalType
+from financial_agent.portfolio.models import AssetClass, SignalType
 
 
 class TestAIResponseParsing:
@@ -74,3 +74,29 @@ class TestAIResponseParsing:
         raw = '{"signals": [{"symbol": "AAPL"}]}'
         signals = analyzer._parse_response(raw)
         assert len(signals) == 0  # Should skip invalid entries
+
+    def test_crypto_symbol_gets_crypto_asset_class(self):
+        analyzer = self._make_analyzer()
+        raw = """
+        {
+          "analysis_summary": "Crypto bullish",
+          "signals": [
+            {
+              "symbol": "BTC/USD",
+              "signal": "buy",
+              "confidence": 0.7,
+              "reason": "Bullish momentum"
+            },
+            {
+              "symbol": "AAPL",
+              "signal": "hold",
+              "confidence": 0.5,
+              "reason": "Neutral"
+            }
+          ]
+        }
+        """
+        signals = analyzer._parse_response(raw)
+        assert len(signals) == 2
+        assert signals[0].asset_class == AssetClass.CRYPTO
+        assert signals[1].asset_class == AssetClass.US_EQUITY
