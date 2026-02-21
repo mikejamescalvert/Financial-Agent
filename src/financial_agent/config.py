@@ -19,7 +19,7 @@ class BrokerConfig(BaseSettings):
     secret_key: str = Field(description="Alpaca secret key (GitHub Secret: ALPACA_SECRET_KEY)")
     base_url: str = Field(
         default="https://paper-api.alpaca.markets",
-        description="Alpaca base URL. Use paper URL for testing. (GitHub Variable: ALPACA_BASE_URL)",
+        description="Alpaca base URL. Use paper URL for testing.",
     )
     data_url: str = Field(
         default="https://data.alpaca.markets",
@@ -50,7 +50,7 @@ class TradingConfig(BaseSettings):
 
     max_position_pct: float = Field(
         default=0.10,
-        description="Max portfolio % for a single position (GitHub Variable: TRADING_MAX_POSITION_PCT)",
+        description="Max portfolio % for a single position.",
     )
     max_daily_trades: int = Field(
         default=10,
@@ -66,7 +66,7 @@ class TradingConfig(BaseSettings):
     )
     min_cash_reserve_pct: float = Field(
         default=0.10,
-        description="Minimum cash reserve as % of portfolio (GitHub Variable: TRADING_MIN_CASH_RESERVE_PCT)",
+        description="Minimum cash reserve as % of portfolio.",
     )
     watchlist: str = Field(
         default="AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ",
@@ -74,7 +74,7 @@ class TradingConfig(BaseSettings):
     )
     strategy: str = Field(
         default="balanced",
-        description="Active strategy: balanced, conservative, momentum (GitHub Variable: TRADING_STRATEGY)",
+        description="Active strategy: balanced, conservative, momentum.",
     )
     dry_run: bool = Field(
         default=True,

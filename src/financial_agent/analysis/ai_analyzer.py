@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import anthropic
 import structlog
 
-from financial_agent.config import AIConfig, TradingConfig
-from financial_agent.portfolio.models import PortfolioSnapshot, SignalType, TradeSignal
+from financial_agent.portfolio.models import SignalType, TradeSignal
+
+if TYPE_CHECKING:
+    from financial_agent.config import AIConfig, TradingConfig
+    from financial_agent.portfolio.models import PortfolioSnapshot
 
 log = structlog.get_logger()
 
@@ -89,14 +93,16 @@ class AIAnalyzer:
         """Build the analysis prompt with all relevant data."""
         positions_data = []
         for p in portfolio.positions:
-            positions_data.append({
-                "symbol": p.symbol,
-                "qty": p.qty,
-                "avg_entry": p.avg_entry_price,
-                "current_price": p.current_price,
-                "unrealized_pl_pct": round(p.unrealized_pl_pct * 100, 2),
-                "weight": round(portfolio.position_weight(p.symbol) * 100, 2),
-            })
+            positions_data.append(
+                {
+                    "symbol": p.symbol,
+                    "qty": p.qty,
+                    "avg_entry": p.avg_entry_price,
+                    "current_price": p.current_price,
+                    "unrealized_pl_pct": round(p.unrealized_pl_pct * 100, 2),
+                    "weight": round(portfolio.position_weight(p.symbol) * 100, 2),
+                }
+            )
 
         return f"""## Current Strategy Mode: {self._strategy}
 
@@ -110,7 +116,12 @@ class AIAnalyzer:
 {json.dumps(positions_data, indent=2)}
 
 ## Technical Indicators by Symbol
-{json.dumps({k: {ik: round(iv, 4) for ik, iv in v.items()} for k, v in technicals.items()}, indent=2)}
+{
+            json.dumps(
+                {k: {ik: round(iv, 4) for ik, iv in v.items()} for k, v in technicals.items()},
+                indent=2,
+            )
+        }
 
 Analyze the above data and provide your trading signals as JSON.
 """

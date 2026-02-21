@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
-import pandas as pd
+from typing import TYPE_CHECKING
+
 import ta
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class TechnicalAnalyzer:
@@ -21,7 +25,7 @@ class TechnicalAnalyzer:
             try:
                 df = bars.loc[symbol].copy()
                 results[symbol] = self._indicators_for_symbol(df)
-            except Exception:
+            except Exception:  # noqa: S112
                 continue
 
         return results

@@ -21,7 +21,7 @@ class TestAIResponseParsing:
 
     def test_parse_valid_response(self):
         analyzer = self._make_analyzer()
-        raw = '''
+        raw = """
         {
           "analysis_summary": "Market looks bullish",
           "signals": [
@@ -42,7 +42,7 @@ class TestAIResponseParsing:
             }
           ]
         }
-        '''
+        """
         signals = analyzer._parse_response(raw)
         assert len(signals) == 2
         assert signals[0].symbol == "AAPL"
@@ -52,14 +52,14 @@ class TestAIResponseParsing:
 
     def test_parse_code_fenced_response(self):
         analyzer = self._make_analyzer()
-        raw = '''```json
+        raw = """```json
         {
           "analysis_summary": "Test",
           "signals": [
             {"symbol": "AAPL", "signal": "sell", "confidence": 0.8, "reason": "Overbought"}
           ]
         }
-        ```'''
+        ```"""
         signals = analyzer._parse_response(raw)
         assert len(signals) == 1
         assert signals[0].signal == SignalType.SELL

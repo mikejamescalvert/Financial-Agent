@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pandas as pd
 import structlog
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
@@ -14,8 +13,12 @@ from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, OrderType, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest
 
-from financial_agent.config import BrokerConfig
-from financial_agent.portfolio.models import Position, PortfolioSnapshot, TradeOrder
+from financial_agent.portfolio.models import PortfolioSnapshot, Position, TradeOrder
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+    from financial_agent.config import BrokerConfig
 
 log = structlog.get_logger()
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -52,7 +52,7 @@ class PortfolioSnapshot(BaseModel):
         return pos.market_value / self.equity
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     BUY = "buy"
     SELL = "sell"
     HOLD = "hold"
