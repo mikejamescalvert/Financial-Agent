@@ -87,7 +87,7 @@ class TestTradeSignal:
     def test_confidence_bounds(self):
         import pytest
 
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             TradeSignal(
                 symbol="AAPL",
                 signal=SignalType.BUY,

@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import structlog
 
-from financial_agent.config import TradingConfig
 from financial_agent.portfolio.models import (
-    PortfolioSnapshot,
     SignalType,
     TradeOrder,
     TradeSignal,
 )
+
+if TYPE_CHECKING:
+    from financial_agent.config import TradingConfig
+    from financial_agent.portfolio.models import PortfolioSnapshot
 
 log = structlog.get_logger()
 
@@ -68,9 +72,7 @@ class StrategyEngine:
     ) -> TradeOrder | None:
         """Size a buy order respecting position limits and cash reserves."""
         # Enforce minimum cash reserve
-        available_cash = portfolio.cash - (
-            portfolio.equity * self._config.min_cash_reserve_pct
-        )
+        available_cash = portfolio.cash - (portfolio.equity * self._config.min_cash_reserve_pct)
         if available_cash <= 0:
             log.info("skip_buy_insufficient_cash", symbol=signal.symbol)
             return None
