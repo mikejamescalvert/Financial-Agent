@@ -6,14 +6,14 @@ from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import structlog
-from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest
+from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
+from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, OrderType, TimeInForce
 from alpaca.trading.requests import MarketOrderRequest
 
-from financial_agent.portfolio.models import PortfolioSnapshot, Position, TradeOrder
+from financial_agent.portfolio.models import AssetClass, PortfolioSnapshot, Position, TradeOrder
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -29,6 +29,7 @@ class AlpacaBroker:
     def __init__(self, config: BrokerConfig) -> None:
         self._trading = TradingClient(config.api_key, config.secret_key)
         self._data = StockHistoricalDataClient(config.api_key, config.secret_key)
+        self._crypto_data = CryptoHistoricalDataClient()
 
     def get_account_info(self) -> dict[str, Any]:
         """Get account balance and status."""
@@ -47,6 +48,11 @@ class AlpacaBroker:
         raw_positions = self._trading.get_all_positions()
         positions = []
         for p in raw_positions:
+            asset_cls = (
+                AssetClass.CRYPTO
+                if getattr(p, "asset_class", None) == "crypto"
+                else AssetClass.US_EQUITY
+            )
             positions.append(
                 Position(
                     symbol=p.symbol,
@@ -57,6 +63,7 @@ class AlpacaBroker:
                     unrealized_pl=float(p.unrealized_pl),
                     unrealized_pl_pct=float(p.unrealized_plpc),
                     side=p.side.value,
+                    asset_class=asset_cls,
                 )
             )
         return positions
@@ -88,6 +95,21 @@ class AlpacaBroker:
         bars = self._data.get_stock_bars(request)
         return bars.df
 
+    def get_crypto_historical_bars(
+        self,
+        symbols: list[str],
+        days: int = 30,
+        timeframe: TimeFrame = TimeFrame.Day,
+    ) -> pd.DataFrame:
+        """Fetch historical crypto bar data for analysis."""
+        request = CryptoBarsRequest(
+            symbol_or_symbols=symbols,
+            timeframe=timeframe,
+            start=datetime.now() - timedelta(days=days),
+        )
+        bars = self._crypto_data.get_crypto_bars(request)
+        return bars.df
+
     def submit_order(self, order: TradeOrder, dry_run: bool = True) -> dict[str, Any]:
         """Submit a trade order. Returns order details."""
         log.info(
@@ -102,12 +124,13 @@ class AlpacaBroker:
             log.info("dry_run_order", order=order.model_dump())
             return {"status": "dry_run", "order": order.model_dump()}
 
+        tif = TimeInForce.GTC if order.asset_class == AssetClass.CRYPTO else TimeInForce.DAY
         request = MarketOrderRequest(
             symbol=order.symbol,
             qty=order.qty,
             side=OrderSide.BUY if order.side == "buy" else OrderSide.SELL,
             type=OrderType.MARKET,
-            time_in_force=TimeInForce.DAY,
+            time_in_force=tif,
         )
         result = self._trading.submit_order(request)
         log.info("order_executed", order_id=result.id, status=result.status)

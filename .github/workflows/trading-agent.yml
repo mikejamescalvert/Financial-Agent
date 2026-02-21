@@ -2,10 +2,9 @@ name: Trading Agent
 
 on:
   schedule:
-    # Every 30 minutes during US market hours (9:30 AM - 4:00 PM ET)
-    # UTC is ET + 5 (EST) or ET + 4 (EDT)
-    # Covers both EST and EDT with a wider window
-    - cron: '*/30 13-21 * * 1-5'  # Mon-Fri, 1:30 PM - 9:30 PM UTC
+    # Every 30 minutes, 24/7 — crypto trades around the clock,
+    # stocks are filtered to market hours in the agent logic
+    - cron: '*/30 * * * *'
 
   workflow_dispatch:
     inputs:
@@ -76,6 +75,7 @@ jobs:
           TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.15' }}
           TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.10' }}
           TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ' }}
+          TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD,SOL/USD' }}
           TRADING_STRATEGY: ${{ inputs.strategy || vars.TRADING_STRATEGY || 'balanced' }}
           TRADING_DRY_RUN: ${{ inputs.dry_run || vars.TRADING_DRY_RUN || 'true' }}
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}

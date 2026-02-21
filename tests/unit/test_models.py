@@ -1,6 +1,7 @@
 """Tests for portfolio data models."""
 
 from financial_agent.portfolio.models import (
+    AssetClass,
     PortfolioSnapshot,
     Position,
     SignalType,
@@ -107,3 +108,51 @@ class TestTradeOrder:
         )
         assert order.symbol == "AAPL"
         assert order.qty == 5.0
+
+    def test_order_default_asset_class(self):
+        order = TradeOrder(symbol="AAPL", side="buy", qty=1.0, reason="test")
+        assert order.asset_class == AssetClass.US_EQUITY
+
+    def test_order_crypto_asset_class(self):
+        order = TradeOrder(
+            symbol="BTC/USD", side="buy", qty=0.01, reason="test", asset_class=AssetClass.CRYPTO
+        )
+        assert order.asset_class == AssetClass.CRYPTO
+
+
+class TestAssetClass:
+    def test_enum_values(self):
+        assert AssetClass.US_EQUITY == "us_equity"
+        assert AssetClass.CRYPTO == "crypto"
+
+    def test_enum_is_str(self):
+        assert isinstance(AssetClass.US_EQUITY, str)
+
+
+class TestPortfolioSnapshotFilters:
+    def test_stock_positions(self):
+        positions = [
+            _make_position(symbol="AAPL", asset_class=AssetClass.US_EQUITY),
+            _make_position(symbol="BTC/USD", asset_class=AssetClass.CRYPTO),
+            _make_position(symbol="MSFT", asset_class=AssetClass.US_EQUITY),
+        ]
+        port = _make_portfolio(positions=positions)
+        stocks = port.stock_positions()
+        assert len(stocks) == 2
+        assert all(p.asset_class == AssetClass.US_EQUITY for p in stocks)
+
+    def test_crypto_positions(self):
+        positions = [
+            _make_position(symbol="AAPL", asset_class=AssetClass.US_EQUITY),
+            _make_position(symbol="BTC/USD", asset_class=AssetClass.CRYPTO),
+            _make_position(symbol="ETH/USD", asset_class=AssetClass.CRYPTO),
+        ]
+        port = _make_portfolio(positions=positions)
+        cryptos = port.crypto_positions()
+        assert len(cryptos) == 2
+        assert all(p.asset_class == AssetClass.CRYPTO for p in cryptos)
+
+    def test_empty_filters(self):
+        port = _make_portfolio(positions=[_make_position(symbol="AAPL")])
+        assert len(port.crypto_positions()) == 0
+        assert len(port.stock_positions()) == 1

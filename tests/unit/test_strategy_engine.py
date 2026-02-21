@@ -2,6 +2,7 @@
 
 from financial_agent.config import TradingConfig
 from financial_agent.portfolio.models import (
+    AssetClass,
     PortfolioSnapshot,
     Position,
     SignalType,
@@ -126,3 +127,58 @@ class TestStrategyEngine:
         signals = [_make_signal(signal=SignalType.BUY)]
         orders = engine.generate_orders(signals, portfolio)
         assert len(orders) == 0
+
+    def test_buy_order_propagates_asset_class(self):
+        engine = StrategyEngine(_make_config())
+        portfolio = _make_portfolio(
+            positions=[
+                Position(
+                    symbol="BTC/USD",
+                    qty=0.1,
+                    avg_entry_price=50000.0,
+                    current_price=55000.0,
+                    market_value=5500.0,
+                    unrealized_pl=500.0,
+                    unrealized_pl_pct=0.10,
+                    asset_class=AssetClass.CRYPTO,
+                )
+            ]
+        )
+        signal = TradeSignal(
+            symbol="BTC/USD",
+            signal=SignalType.BUY,
+            confidence=0.8,
+            reason="Bullish breakout",
+            asset_class=AssetClass.CRYPTO,
+        )
+        orders = engine.generate_orders([signal], portfolio)
+        assert len(orders) == 1
+        assert orders[0].asset_class == AssetClass.CRYPTO
+
+    def test_sell_order_propagates_asset_class(self):
+        engine = StrategyEngine(_make_config())
+        portfolio = _make_portfolio(
+            positions=[
+                Position(
+                    symbol="ETH/USD",
+                    qty=5.0,
+                    avg_entry_price=3000.0,
+                    current_price=3500.0,
+                    market_value=17500.0,
+                    unrealized_pl=2500.0,
+                    unrealized_pl_pct=0.1667,
+                    asset_class=AssetClass.CRYPTO,
+                )
+            ]
+        )
+        signal = TradeSignal(
+            symbol="ETH/USD",
+            signal=SignalType.SELL,
+            confidence=0.6,
+            reason="Taking profits",
+            asset_class=AssetClass.CRYPTO,
+        )
+        orders = engine.generate_orders([signal], portfolio)
+        assert len(orders) == 1
+        assert orders[0].asset_class == AssetClass.CRYPTO
+        assert orders[0].side == "sell"

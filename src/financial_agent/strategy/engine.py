@@ -112,6 +112,7 @@ class StrategyEngine:
             qty=qty,
             reason=signal.reason,
             signal_confidence=signal.confidence,
+            asset_class=signal.asset_class,
         )
 
     def _size_sell_order(
@@ -136,4 +137,5 @@ class StrategyEngine:
             qty=sell_qty,
             reason=signal.reason,
             signal_confidence=signal.confidence,
+            asset_class=signal.asset_class,
         )

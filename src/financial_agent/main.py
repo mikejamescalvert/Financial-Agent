@@ -37,10 +37,9 @@ def main() -> None:
     ai = AIAnalyzer(config.ai, config.trading)
     engine = StrategyEngine(config.trading)
 
-    # Step 1: Check market status
-    if not broker.is_market_open():
-        log.info("market_closed", message="Market is closed. Skipping this run.")
-        return
+    # Step 1: Check market status (stocks only when open, crypto always)
+    market_open = broker.is_market_open()
+    log.info("market_status", market_open=market_open)
 
     # Step 2: Get portfolio snapshot
     portfolio = broker.get_portfolio_snapshot()
@@ -51,34 +50,56 @@ def main() -> None:
         positions=portfolio.position_count,
     )
 
-    # Step 3: Get watchlist symbols (include existing positions)
-    watchlist = [s.strip() for s in config.trading.watchlist.split(",")]
-    held_symbols = [p.symbol for p in portfolio.positions]
-    all_symbols = list(set(watchlist + held_symbols))
+    technicals: dict[str, dict[str, float]] = {}
 
-    # Step 4: Run technical analysis
-    log.info("technical_analysis_started", symbols=all_symbols)
-    bars = broker.get_historical_bars(all_symbols, days=60)
-    technicals = technical.compute_indicators(bars)
-    log.info("technical_analysis_complete", analyzed=len(technicals))
+    # Step 3a: Crypto pipeline (always runs)
+    crypto_watchlist = [s.strip() for s in config.trading.crypto_watchlist.split(",")]
+    held_crypto = [p.symbol for p in portfolio.crypto_positions()]
+    all_crypto = list(set(crypto_watchlist + held_crypto))
 
-    # Step 5: AI analysis
+    if all_crypto:
+        log.info("crypto_analysis_started", symbols=all_crypto)
+        crypto_bars = broker.get_crypto_historical_bars(all_crypto, days=60)
+        crypto_technicals = technical.compute_indicators(crypto_bars)
+        technicals.update(crypto_technicals)
+        log.info("crypto_analysis_complete", analyzed=len(crypto_technicals))
+
+    # Step 3b: Stock pipeline (only when market is open)
+    if market_open:
+        stock_watchlist = [s.strip() for s in config.trading.watchlist.split(",")]
+        held_stocks = [p.symbol for p in portfolio.stock_positions()]
+        all_stocks = list(set(stock_watchlist + held_stocks))
+
+        log.info("stock_analysis_started", symbols=all_stocks)
+        stock_bars = broker.get_historical_bars(all_stocks, days=60)
+        stock_technicals = technical.compute_indicators(stock_bars)
+        technicals.update(stock_technicals)
+        log.info("stock_analysis_complete", analyzed=len(stock_technicals))
+    else:
+        log.info("stock_analysis_skipped", reason="market_closed")
+
+    if not technicals:
+        log.info("no_symbols_to_analyze", message="No technicals computed. Skipping.")
+        return
+
+    # Step 4: AI analysis (single pass with all technicals)
     signals = ai.analyze(portfolio, technicals)
 
-    # Step 6: Generate orders
+    # Step 5: Generate orders
     orders = engine.generate_orders(signals, portfolio)
     log.info("orders_generated", count=len(orders))
 
-    # Step 7: Execute orders
+    # Step 6: Execute orders
     results = []
     for order in orders:
         result = broker.submit_order(order, dry_run=config.trading.dry_run)
         results.append(result)
 
-    # Step 8: Summary
+    # Step 7: Summary
     summary = {
         "equity": portfolio.equity,
         "cash": portfolio.cash,
+        "market_open": market_open,
         "signals": {
             "buy": sum(1 for s in signals if s.signal == SignalType.BUY),
             "sell": sum(1 for s in signals if s.signal == SignalType.SELL),

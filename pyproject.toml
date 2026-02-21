@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "financial-agent"
 version = "0.1.0"
-description = "AI-powered stock portfolio analyzer and trading agent"
+description = "AI-powered stock and cryptocurrency portfolio analyzer and trading agent"
 requires-python = ">=3.11"
 dependencies = [
     "alpaca-py>=0.21.0",

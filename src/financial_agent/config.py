@@ -72,6 +72,10 @@ class TradingConfig(BaseSettings):
         default="AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ",
         description="Comma-separated watchlist (GitHub Variable: TRADING_WATCHLIST)",
     )
+    crypto_watchlist: str = Field(
+        default="BTC/USD,ETH/USD,SOL/USD",
+        description="Comma-separated crypto watchlist (GitHub Variable: TRADING_CRYPTO_WATCHLIST)",
+    )
     strategy: str = Field(
         default="balanced",
         description="Active strategy: balanced, conservative, momentum.",
