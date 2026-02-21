@@ -41,7 +41,7 @@ Go to **Settings > Secrets and variables > Actions > Variables** and add:
 | `TRADING_WATCHLIST` | `AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ` | Comma-separated stock symbols |
 | `TRADING_CRYPTO_WATCHLIST` | `BTC/USD,ETH/USD,SOL/USD` | Comma-separated crypto pairs (Alpaca format) |
 | `TRADING_STRATEGY` | `balanced` | Strategy: `balanced`, `conservative`, `momentum` |
-| `TRADING_DRY_RUN` | `true` | Set to `false` to enable real trades |
+| `TRADING_DRY_RUN` | `false` | Set to `true` to disable trading and only log orders |
 | `TRADING_MAX_POSITION_PCT` | `0.10` | Max portfolio % for a single position |
 | `TRADING_MAX_DAILY_TRADES` | `10` | Max trades per day |
 | `TRADING_STOP_LOSS_PCT` | `0.05` | Default stop loss % |
@@ -106,8 +106,8 @@ The trading agent runs automatically on schedule. You can also trigger it manual
 
 ## Safety Features
 
-- **Dry-run mode** is ON by default — no real trades until you explicitly disable it
-- **Paper trading** URL is the default broker endpoint
+- **Paper trading** URL is the default broker endpoint — trades go to your Alpaca paper account, not real money
+- **Dry-run mode** can be enabled via `TRADING_DRY_RUN=true` to log orders without submitting them
 - **Position limits** prevent over-concentration in any single asset
 - **Cash reserves** ensure you always maintain a minimum cash buffer
 - **Separate asset pipelines** — crypto and stocks are analyzed independently with asset-appropriate risk rules
@@ -133,7 +133,7 @@ mypy src/
 
 ## Going Live
 
-1. Set `TRADING_DRY_RUN` variable to `false`
-2. Change `ALPACA_BASE_URL` to `https://api.alpaca.markets`
-3. Start with a small watchlist and conservative strategy
-4. Monitor the Actions tab for execution summaries
+1. Change `ALPACA_BASE_URL` to `https://api.alpaca.markets`
+2. Start with a small watchlist and conservative strategy
+3. Monitor the Actions tab for execution summaries
+4. Set `TRADING_DRY_RUN=true` if you need to pause trading without disabling the workflow
