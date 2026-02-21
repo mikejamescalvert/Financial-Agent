@@ -1,0 +1,74 @@
+name: Watchlist Review
+
+on:
+  schedule:
+    # Run weekly on Sunday at 6 PM UTC (before Monday open)
+    - cron: '0 18 * * 0'
+
+  workflow_dispatch:  # Allow manual trigger
+
+concurrency:
+  group: watchlist-review
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+  variables: write
+
+jobs:
+  review:
+    name: Screen Universe & Update Watchlist
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Only run on the main branch
+    if: github.ref == 'refs/heads/main'
+
+    environment: trading
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Run watchlist review
+        id: review
+        env:
+          # Secrets
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # Configuration
+          ALPACA_BASE_URL: ${{ vars.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets' }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514' }}
+          TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ' }}
+          TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD,SOL/USD' }}
+          TRADING_STOCK_UNIVERSE: ${{ vars.TRADING_STOCK_UNIVERSE || '' }}
+          TRADING_CRYPTO_UNIVERSE: ${{ vars.TRADING_CRYPTO_UNIVERSE || '' }}
+          TRADING_STRATEGY: ${{ vars.TRADING_STRATEGY || 'balanced' }}
+          TRADING_MAX_POSITION_PCT: ${{ vars.TRADING_MAX_POSITION_PCT || '0.10' }}
+          TRADING_STOP_LOSS_PCT: ${{ vars.TRADING_STOP_LOSS_PCT || '0.05' }}
+          TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.15' }}
+          TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.10' }}
+          TRADING_MAX_DAILY_TRADES: ${{ vars.TRADING_MAX_DAILY_TRADES || '10' }}
+          TRADING_DRY_RUN: 'true'
+          LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m financial_agent.watchlist_main
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## Watchlist Review" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
