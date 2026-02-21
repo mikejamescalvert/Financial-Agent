@@ -63,13 +63,20 @@ class AIAnalyzer:
         self._model = ai_config.model
         self._max_tokens = ai_config.max_tokens
         self._strategy = trading_config.strategy
+        self._max_position_pct = trading_config.max_position_pct
+        self._stop_loss_pct = trading_config.stop_loss_pct
+        self._take_profit_pct = trading_config.take_profit_pct
+        self._min_cash_reserve_pct = trading_config.min_cash_reserve_pct
 
     def analyze(
         self,
         portfolio: PortfolioSnapshot,
         technicals: dict[str, dict[str, float]],
-    ) -> list[TradeSignal]:
-        """Send portfolio + technical data to Claude and parse trade signals."""
+    ) -> tuple[list[TradeSignal], str]:
+        """Send portfolio + technical data to Claude and parse trade signals.
+
+        Returns a tuple of (signals, analysis_summary).
+        """
         prompt = self._build_prompt(portfolio, technicals)
 
         log.info("ai_analysis_started", model=self._model, symbols=list(technicals.keys()))
@@ -82,16 +89,17 @@ class AIAnalyzer:
         )
 
         raw_text = response.content[0].text
-        signals = self._parse_response(raw_text)
+        signals, analysis_summary = self._parse_response(raw_text)
 
         log.info(
             "ai_analysis_complete",
             signal_count=len(signals),
             buy_count=sum(1 for s in signals if s.signal == SignalType.BUY),
             sell_count=sum(1 for s in signals if s.signal == SignalType.SELL),
+            analysis_summary=analysis_summary,
         )
 
-        return signals
+        return signals, analysis_summary
 
     def _build_prompt(
         self,
@@ -114,6 +122,12 @@ class AIAnalyzer:
 
         return f"""## Current Strategy Mode: {self._strategy}
 
+## Risk Parameters
+- Max position size: {self._max_position_pct * 100:.0f}% of portfolio
+- Stop loss target: {self._stop_loss_pct * 100:.1f}%
+- Take profit target: {self._take_profit_pct * 100:.1f}%
+- Min cash reserve: {self._min_cash_reserve_pct * 100:.0f}% of portfolio
+
 ## Portfolio Overview
 - Equity: ${portfolio.equity:,.2f}
 - Cash: ${portfolio.cash:,.2f} ({portfolio.cash / portfolio.equity * 100:.1f}% of equity)
@@ -134,8 +148,8 @@ class AIAnalyzer:
 Analyze the above data and provide your trading signals as JSON.
 """
 
-    def _parse_response(self, raw: str) -> list[TradeSignal]:
-        """Parse Claude's JSON response into TradeSignal objects."""
+    def _parse_response(self, raw: str) -> tuple[list[TradeSignal], str]:
+        """Parse Claude's JSON response into TradeSignal objects and summary."""
         # Strip markdown code fences if present
         text = raw.strip()
         if text.startswith("```"):
@@ -148,7 +162,9 @@ Analyze the above data and provide your trading signals as JSON.
             data = json.loads(text)
         except json.JSONDecodeError:
             log.error("ai_response_parse_error", raw=raw[:500])
-            return []
+            return [], ""
+
+        analysis_summary = data.get("analysis_summary", "")
 
         signals: list[TradeSignal] = []
         for entry in data.get("signals", []):
@@ -170,4 +186,4 @@ Analyze the above data and provide your trading signals as JSON.
             except (KeyError, ValueError) as e:
                 log.warning("skipping_invalid_signal", entry=entry, error=str(e))
 
-        return signals
+        return signals, analysis_summary

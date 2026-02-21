@@ -59,7 +59,7 @@ def main() -> None:
 
     if all_crypto:
         log.info("crypto_analysis_started", symbols=all_crypto)
-        crypto_bars = broker.get_crypto_historical_bars(all_crypto, days=60)
+        crypto_bars = broker.get_crypto_historical_bars(all_crypto, days=90)
         crypto_technicals = technical.compute_indicators(crypto_bars)
         technicals.update(crypto_technicals)
         log.info("crypto_analysis_complete", analyzed=len(crypto_technicals))
@@ -71,7 +71,7 @@ def main() -> None:
         all_stocks = list(set(stock_watchlist + held_stocks))
 
         log.info("stock_analysis_started", symbols=all_stocks)
-        stock_bars = broker.get_historical_bars(all_stocks, days=60)
+        stock_bars = broker.get_historical_bars(all_stocks, days=90)
         stock_technicals = technical.compute_indicators(stock_bars)
         technicals.update(stock_technicals)
         log.info("stock_analysis_complete", analyzed=len(stock_technicals))
@@ -83,10 +83,10 @@ def main() -> None:
         return
 
     # Step 4: AI analysis (single pass with all technicals)
-    signals = ai.analyze(portfolio, technicals)
+    signals, analysis_summary = ai.analyze(portfolio, technicals)
 
     # Step 5: Generate orders
-    orders = engine.generate_orders(signals, portfolio)
+    orders = engine.generate_orders(signals, portfolio, technicals)
     log.info("orders_generated", count=len(orders))
 
     # Step 6: Execute orders
@@ -100,6 +100,7 @@ def main() -> None:
         "equity": portfolio.equity,
         "cash": portfolio.cash,
         "market_open": market_open,
+        "analysis_summary": analysis_summary,
         "signals": {
             "buy": sum(1 for s in signals if s.signal == SignalType.BUY),
             "sell": sum(1 for s in signals if s.signal == SignalType.SELL),

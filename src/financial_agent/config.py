@@ -81,7 +81,7 @@ class TradingConfig(BaseSettings):
         description="Active strategy: balanced, conservative, momentum.",
     )
     dry_run: bool = Field(
-        default=True,
+        default=False,
         description="If true, log trades but don't execute (GitHub Variable: TRADING_DRY_RUN)",
     )
 

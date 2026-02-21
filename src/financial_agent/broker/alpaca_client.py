@@ -27,9 +27,13 @@ class AlpacaBroker:
     """Interface to Alpaca for market data and trade execution."""
 
     def __init__(self, config: BrokerConfig) -> None:
-        self._trading = TradingClient(config.api_key, config.secret_key)
-        self._data = StockHistoricalDataClient(config.api_key, config.secret_key)
-        self._crypto_data = CryptoHistoricalDataClient()
+        self._trading = TradingClient(
+            config.api_key, config.secret_key, url_override=config.base_url
+        )
+        self._data = StockHistoricalDataClient(
+            config.api_key, config.secret_key, url_override=config.data_url
+        )
+        self._crypto_data = CryptoHistoricalDataClient(url_override=config.data_url)
 
     def get_account_info(self) -> dict[str, Any]:
         """Get account balance and status."""

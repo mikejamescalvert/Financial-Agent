@@ -1,14 +1,14 @@
 # Financial Agent
 
-AI-powered stock portfolio analyzer and trading agent that runs as a GitHub Action.
+AI-powered stock and cryptocurrency portfolio analyzer and trading agent that runs as a GitHub Action.
 
 ## How It Works
 
-Every 30 minutes during market hours (Mon-Fri), the agent:
+The agent runs every 30 minutes, 24/7. Crypto is analyzed on every run; stocks are only analyzed when the US market is open.
 
-1. **Checks** if the market is open
-2. **Fetches** your current portfolio from Alpaca
-3. **Runs technical analysis** (RSI, MACD, Bollinger Bands, etc.) on your watchlist
+1. **Checks** if the stock market is open (crypto always trades)
+2. **Fetches** your current portfolio from Alpaca (stocks + crypto)
+3. **Runs technical analysis** (RSI, MACD, Bollinger Bands, etc.) on your watchlists
 4. **Sends everything to Claude** for AI-powered analysis
 5. **Generates trade orders** with position sizing and risk management
 6. **Executes trades** (or logs them in dry-run mode)
@@ -39,8 +39,9 @@ Go to **Settings > Secrets and variables > Actions > Variables** and add:
 | `ALPACA_BASE_URL` | `https://paper-api.alpaca.markets` | Broker URL. Use `https://api.alpaca.markets` for live trading |
 | `ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | Claude model for analysis |
 | `TRADING_WATCHLIST` | `AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ` | Comma-separated stock symbols |
+| `TRADING_CRYPTO_WATCHLIST` | `BTC/USD,ETH/USD,SOL/USD` | Comma-separated crypto pairs (Alpaca format) |
 | `TRADING_STRATEGY` | `balanced` | Strategy: `balanced`, `conservative`, `momentum` |
-| `TRADING_DRY_RUN` | `true` | Set to `false` to enable real trades |
+| `TRADING_DRY_RUN` | `false` | Set to `true` to disable trading and only log orders |
 | `TRADING_MAX_POSITION_PCT` | `0.10` | Max portfolio % for a single position |
 | `TRADING_MAX_DAILY_TRADES` | `10` | Max trades per day |
 | `TRADING_STOP_LOSS_PCT` | `0.05` | Default stop loss % |
@@ -105,10 +106,11 @@ The trading agent runs automatically on schedule. You can also trigger it manual
 
 ## Safety Features
 
-- **Dry-run mode** is ON by default — no real trades until you explicitly disable it
-- **Paper trading** URL is the default broker endpoint
-- **Position limits** prevent over-concentration in a single stock
+- **Paper trading** URL is the default broker endpoint — trades go to your Alpaca paper account, not real money
+- **Dry-run mode** can be enabled via `TRADING_DRY_RUN=true` to log orders without submitting them
+- **Position limits** prevent over-concentration in any single asset
 - **Cash reserves** ensure you always maintain a minimum cash buffer
+- **Separate asset pipelines** — crypto and stocks are analyzed independently with asset-appropriate risk rules
 - **Daily trade limits** prevent runaway execution
 - **Environment protection** requires manual approval for the trading environment
 - **CI pipeline** runs lint, type checks, tests, and security scans on every PR
@@ -131,7 +133,7 @@ mypy src/
 
 ## Going Live
 
-1. Set `TRADING_DRY_RUN` variable to `false`
-2. Change `ALPACA_BASE_URL` to `https://api.alpaca.markets`
-3. Start with a small watchlist and conservative strategy
-4. Monitor the Actions tab for execution summaries
+1. Change `ALPACA_BASE_URL` to `https://api.alpaca.markets`
+2. Start with a small watchlist and conservative strategy
+3. Monitor the Actions tab for execution summaries
+4. Set `TRADING_DRY_RUN=true` if you need to pause trading without disabling the workflow
