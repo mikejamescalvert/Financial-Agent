@@ -43,12 +43,13 @@ class TestAIResponseParsing:
           ]
         }
         """
-        signals = analyzer._parse_response(raw)
+        signals, summary = analyzer._parse_response(raw)
         assert len(signals) == 2
         assert signals[0].symbol == "AAPL"
         assert signals[0].signal == SignalType.BUY
         assert signals[0].confidence == 0.75
         assert signals[1].signal == SignalType.HOLD
+        assert summary == "Market looks bullish"
 
     def test_parse_code_fenced_response(self):
         analyzer = self._make_analyzer()
@@ -60,19 +61,21 @@ class TestAIResponseParsing:
           ]
         }
         ```"""
-        signals = analyzer._parse_response(raw)
+        signals, summary = analyzer._parse_response(raw)
         assert len(signals) == 1
         assert signals[0].signal == SignalType.SELL
+        assert summary == "Test"
 
     def test_parse_invalid_json(self):
         analyzer = self._make_analyzer()
-        signals = analyzer._parse_response("this is not json")
+        signals, summary = analyzer._parse_response("this is not json")
         assert signals == []
+        assert summary == ""
 
     def test_parse_missing_fields(self):
         analyzer = self._make_analyzer()
         raw = '{"signals": [{"symbol": "AAPL"}]}'
-        signals = analyzer._parse_response(raw)
+        signals, summary = analyzer._parse_response(raw)
         assert len(signals) == 0  # Should skip invalid entries
 
     def test_crypto_symbol_gets_crypto_asset_class(self):
@@ -96,7 +99,7 @@ class TestAIResponseParsing:
           ]
         }
         """
-        signals = analyzer._parse_response(raw)
+        signals, summary = analyzer._parse_response(raw)
         assert len(signals) == 2
         assert signals[0].asset_class == AssetClass.CRYPTO
         assert signals[1].asset_class == AssetClass.US_EQUITY

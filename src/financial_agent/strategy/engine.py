@@ -29,15 +29,17 @@ class StrategyEngine:
         self,
         signals: list[TradeSignal],
         portfolio: PortfolioSnapshot,
+        technicals: dict[str, dict[str, float]] | None = None,
     ) -> list[TradeOrder]:
         """Convert trade signals into concrete orders with position sizing and risk checks."""
         orders: list[TradeOrder] = []
+        technicals = technicals or {}
 
         for signal in signals:
             if signal.signal == SignalType.HOLD:
                 continue
 
-            order = self._signal_to_order(signal, portfolio)
+            order = self._signal_to_order(signal, portfolio, technicals)
             if order is not None:
                 orders.append(order)
 
@@ -57,10 +59,11 @@ class StrategyEngine:
         self,
         signal: TradeSignal,
         portfolio: PortfolioSnapshot,
+        technicals: dict[str, dict[str, float]],
     ) -> TradeOrder | None:
         """Convert a single signal to an order with position sizing."""
         if signal.signal == SignalType.BUY:
-            return self._size_buy_order(signal, portfolio)
+            return self._size_buy_order(signal, portfolio, technicals)
         elif signal.signal == SignalType.SELL:
             return self._size_sell_order(signal, portfolio)
         return None
@@ -69,6 +72,7 @@ class StrategyEngine:
         self,
         signal: TradeSignal,
         portfolio: PortfolioSnapshot,
+        technicals: dict[str, dict[str, float]],
     ) -> TradeOrder | None:
         """Size a buy order respecting position limits and cash reserves."""
         # Enforce minimum cash reserve
@@ -98,9 +102,16 @@ class StrategyEngine:
         if target_value < 1.0:
             return None
 
-        # Estimate qty (using current price from signal context)
+        # Get current price: existing position > technicals > skip
         current_pos = portfolio.get_position(signal.symbol)
-        est_price = current_pos.current_price if current_pos else target_value
+        if current_pos:
+            est_price = current_pos.current_price
+        elif signal.symbol in technicals and "current_price" in technicals[signal.symbol]:
+            est_price = technicals[signal.symbol]["current_price"]
+        else:
+            log.warning("skip_buy_no_price", symbol=signal.symbol)
+            return None
+
         qty = round(target_value / est_price, 2) if est_price > 0 else 0
 
         if qty <= 0:

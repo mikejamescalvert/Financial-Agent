@@ -124,7 +124,26 @@ class TestStrategyEngine:
         engine = StrategyEngine(_make_config(min_cash_reserve_pct=0.50))
         # Cash is 20% of equity but reserve is 50%, so no buys allowed
         portfolio = _make_portfolio(equity=100000.0, cash=20000.0)
+        technicals = {"AAPL": {"current_price": 160.0}}
         signals = [_make_signal(signal=SignalType.BUY)]
+        orders = engine.generate_orders(signals, portfolio, technicals)
+        assert len(orders) == 0
+
+    def test_buy_new_position_uses_technicals_price(self):
+        engine = StrategyEngine(_make_config())
+        portfolio = _make_portfolio(equity=100000.0, cash=20000.0)
+        technicals = {"AAPL": {"current_price": 160.0}}
+        signals = [_make_signal(signal=SignalType.BUY, confidence=0.8)]
+        orders = engine.generate_orders(signals, portfolio, technicals)
+        assert len(orders) == 1
+        # target_value = min(10000*0.8, 10000, 10000) = 8000
+        # qty = 8000 / 160 = 50.0
+        assert orders[0].qty == 50.0
+
+    def test_buy_new_position_skipped_without_price(self):
+        engine = StrategyEngine(_make_config())
+        portfolio = _make_portfolio(equity=100000.0, cash=20000.0)
+        signals = [_make_signal(signal=SignalType.BUY, confidence=0.8)]
         orders = engine.generate_orders(signals, portfolio)
         assert len(orders) == 0
 
