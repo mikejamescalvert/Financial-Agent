@@ -76,6 +76,19 @@ class TradingConfig(BaseSettings):
         default="BTC/USD,ETH/USD,SOL/USD",
         description="Comma-separated crypto watchlist (GitHub Variable: TRADING_CRYPTO_WATCHLIST)",
     )
+    stock_universe: str = Field(
+        default=(
+            "AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ,"
+            "UNH,HD,PG,MA,DIS,NFLX,ADBE,CRM,COST,PEP,"
+            "AMD,INTC,QCOM,AVGO,ORCL,CSCO,IBM,NOW,UBER,SQ,"
+            "BA,CAT,GE,MMM,LMT,RTX,GS,MS,BRK.B,WMT"
+        ),
+        description="Broad screening universe for watchlist review.",
+    )
+    crypto_universe: str = Field(
+        default="BTC/USD,ETH/USD,SOL/USD,DOGE/USD,AVAX/USD,LINK/USD,DOT/USD,MATIC/USD,ADA/USD",
+        description="Broad crypto screening universe (GitHub Variable: TRADING_CRYPTO_UNIVERSE)",
+    )
     strategy: str = Field(
         default="balanced",
         description="Active strategy: balanced, conservative, momentum.",
