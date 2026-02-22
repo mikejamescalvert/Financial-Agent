@@ -45,3 +45,7 @@ logs/
 
 # Trading data cache
 data/cache/
+
+# Persistent agent data (trade theses, equity history, trade journal)
+# These are persisted via GitHub Actions cache, not committed
+.data/

@@ -13,6 +13,27 @@ class AssetClass(StrEnum):
     CRYPTO = "crypto"
 
 
+class SignalType(StrEnum):
+    BUY = "buy"
+    SELL = "sell"
+    HOLD = "hold"
+
+
+class OrderType(StrEnum):
+    MARKET = "market"
+    LIMIT = "limit"
+    STOP_LIMIT = "stop_limit"
+
+
+class PositionStage(StrEnum):
+    """Tracks where a position is in its lifecycle for scaling."""
+
+    INITIAL = "initial"  # First 1/3 entry
+    BUILDING = "building"  # Second 1/3 added
+    FULL = "full"  # Full position
+    REDUCING = "reducing"  # Taking partial profits
+
+
 class Position(BaseModel):
     """A single position (stock or crypto)."""
 
@@ -25,6 +46,9 @@ class Position(BaseModel):
     unrealized_pl_pct: float
     side: str = "long"
     asset_class: AssetClass = AssetClass.US_EQUITY
+    sector: str = ""
+    highest_price: float = 0.0
+    stage: PositionStage = PositionStage.FULL
 
 
 class PortfolioSnapshot(BaseModel):
@@ -65,15 +89,18 @@ class PortfolioSnapshot(BaseModel):
         """Return only crypto positions."""
         return [p for p in self.positions if p.asset_class == AssetClass.CRYPTO]
 
-
-class SignalType(StrEnum):
-    BUY = "buy"
-    SELL = "sell"
-    HOLD = "hold"
+    def sector_exposure(self) -> dict[str, float]:
+        """Return sector allocation as {sector: weight}."""
+        exposure: dict[str, float] = {}
+        for p in self.positions:
+            if p.sector and self.equity > 0:
+                weight = p.market_value / self.equity
+                exposure[p.sector] = exposure.get(p.sector, 0.0) + weight
+        return exposure
 
 
 class TradeSignal(BaseModel):
-    """A trading signal produced by the strategy engine."""
+    """A trading signal produced by the AI analyzer."""
 
     symbol: str
     signal: SignalType
@@ -83,6 +110,7 @@ class TradeSignal(BaseModel):
     stop_loss: float | None = None
     take_profit: float | None = None
     asset_class: AssetClass = AssetClass.US_EQUITY
+    scale_action: str = ""  # "add", "partial_exit", "" for full
 
 
 class TradeOrder(BaseModel):
@@ -94,3 +122,5 @@ class TradeOrder(BaseModel):
     reason: str
     signal_confidence: float = 0.0
     asset_class: AssetClass = AssetClass.US_EQUITY
+    order_type: OrderType = OrderType.MARKET
+    limit_price: float | None = None
