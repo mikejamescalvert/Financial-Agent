@@ -11,14 +11,16 @@ This is called by the GitHub Action on schedule. It:
 from __future__ import annotations
 
 import json
+import os
 import sys
+from datetime import UTC, datetime
 
 import structlog
 
 from financial_agent.analysis import AIAnalyzer
 from financial_agent.broker import AlpacaBroker
 from financial_agent.config import AppConfig
-from financial_agent.portfolio.models import SignalType
+from financial_agent.portfolio.models import SignalType, TradeOrder, TradeSignal
 from financial_agent.strategy import StrategyEngine, TechnicalAnalyzer
 from financial_agent.utils.logging import setup_logging
 
@@ -111,8 +113,18 @@ def main() -> None:
     }
     log.info("agent_complete", **summary)
 
-    # Write summary to GitHub Actions output if available
+    # Write outputs for GitHub Actions
     _write_github_output(summary)
+    _write_step_summary(
+        portfolio=portfolio,
+        market_open=market_open,
+        analysis_summary=analysis_summary,
+        signals=signals,
+        orders=orders,
+        results=results,
+        dry_run=config.trading.dry_run,
+        strategy=config.trading.strategy,
+    )
 
 
 def _normalize_crypto_symbol(symbol: str) -> str:
@@ -130,12 +142,125 @@ def _normalize_crypto_symbol(symbol: str) -> str:
 
 def _write_github_output(summary: dict[str, object]) -> None:
     """Write summary to GITHUB_OUTPUT for use in subsequent workflow steps."""
-    import os
-
     output_file = os.environ.get("GITHUB_OUTPUT")
     if output_file:
         with open(output_file, "a") as f:
             f.write(f"summary={json.dumps(summary)}\n")
+
+
+def _write_step_summary(  # noqa: PLR0913
+    *,
+    portfolio: object,
+    market_open: bool,
+    analysis_summary: str,
+    signals: list[TradeSignal],
+    orders: list[TradeOrder],
+    results: list[dict[str, object]],
+    dry_run: bool,
+    strategy: str,
+) -> None:
+    """Write a rich markdown summary to GITHUB_STEP_SUMMARY."""
+    summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_file:
+        return
+
+    from financial_agent.portfolio.models import PortfolioSnapshot
+
+    assert isinstance(portfolio, PortfolioSnapshot)
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
+    market_status = "Open" if market_open else "Closed"
+    mode = "DRY RUN" if dry_run else "LIVE"
+
+    lines: list[str] = []
+    lines.append(f"## Trading Agent Run — {now}")
+    lines.append("")
+    lines.append(f"**Mode:** {mode} | **Strategy:** {strategy} | **Market:** {market_status}")
+    lines.append("")
+
+    # Portfolio overview
+    lines.append("### Portfolio")
+    lines.append("")
+    lines.append("| Metric | Value |")
+    lines.append("|--------|-------|")
+    lines.append(f"| Equity | ${portfolio.equity:,.2f} |")
+    lines.append(f"| Cash | ${portfolio.cash:,.2f} |")
+    lines.append(f"| Positions | {portfolio.position_count} |")
+    lines.append(f"| Unrealized P/L | ${portfolio.total_unrealized_pl:,.2f} |")
+    lines.append("")
+
+    if portfolio.positions:
+        lines.append("<details><summary>Current positions</summary>")
+        lines.append("")
+        lines.append("| Symbol | Qty | Entry | Current | P/L % | Class |")
+        lines.append("|--------|-----|-------|---------|-------|-------|")
+        for p in portfolio.positions:
+            pl_pct = f"{p.unrealized_pl_pct * 100:+.1f}%"
+            cls = "Crypto" if p.asset_class == "crypto" else "Stock"
+            lines.append(
+                f"| {p.symbol} | {p.qty:.4g} | ${p.avg_entry_price:,.2f} "
+                f"| ${p.current_price:,.2f} | {pl_pct} | {cls} |"
+            )
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
+
+    # AI analysis
+    lines.append("### AI Analysis")
+    lines.append("")
+    lines.append(f"> {analysis_summary}")
+    lines.append("")
+
+    # Signals
+    buy_signals = [s for s in signals if s.signal == SignalType.BUY]
+    sell_signals = [s for s in signals if s.signal == SignalType.SELL]
+    hold_signals = [s for s in signals if s.signal == SignalType.HOLD]
+
+    lines.append(
+        f"### Signals ({len(buy_signals)} buy, {len(sell_signals)} sell, {len(hold_signals)} hold)"
+    )
+    lines.append("")
+
+    actionable = [s for s in signals if s.signal != SignalType.HOLD]
+    if actionable:
+        lines.append("| Symbol | Signal | Confidence | Reason |")
+        lines.append("|--------|--------|------------|--------|")
+        for s in sorted(actionable, key=lambda x: x.confidence, reverse=True):
+            emoji = "BUY" if s.signal == SignalType.BUY else "SELL"
+            lines.append(f"| {s.symbol} | {emoji} | {s.confidence:.0%} | {s.reason} |")
+        lines.append("")
+
+    if hold_signals:
+        lines.append(f"<details><summary>{len(hold_signals)} hold signals</summary>")
+        lines.append("")
+        lines.append("| Symbol | Confidence | Reason |")
+        lines.append("|--------|------------|--------|")
+        for s in hold_signals:
+            lines.append(f"| {s.symbol} | {s.confidence:.0%} | {s.reason} |")
+        lines.append("")
+        lines.append("</details>")
+        lines.append("")
+
+    # Orders
+    lines.append(f"### Orders Executed ({len(orders)})")
+    lines.append("")
+
+    if orders:
+        lines.append("| Symbol | Side | Qty | Confidence | Status |")
+        lines.append("|--------|------|-----|------------|--------|")
+        for order, result in zip(orders, results, strict=True):
+            status = result.get("status", "unknown")
+            side = order.side.upper()
+            lines.append(
+                f"| {order.symbol} | {side} | {order.qty:.4g} "
+                f"| {order.signal_confidence:.0%} | {status} |"
+            )
+        lines.append("")
+    else:
+        lines.append("No orders generated this cycle.")
+        lines.append("")
+
+    with open(summary_file, "a") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 if __name__ == "__main__":

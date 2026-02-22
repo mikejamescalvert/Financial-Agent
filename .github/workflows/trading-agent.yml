@@ -82,11 +82,13 @@ jobs:
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
         run: python -m financial_agent.main
 
-      - name: Post summary
-        if: always()
+      - name: Post failure summary
+        if: failure()
         run: |
-          echo "## Trading Agent Run" >> $GITHUB_STEP_SUMMARY
+          echo "## Trading Agent Run — FAILED" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
           echo "- **Strategy:** ${{ inputs.strategy || vars.TRADING_STRATEGY || 'balanced' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Dry Run:** ${{ inputs.dry_run || vars.TRADING_DRY_RUN || 'false' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The agent crashed before completing. Check the logs above for details." >> $GITHUB_STEP_SUMMARY
