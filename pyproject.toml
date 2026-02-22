@@ -31,6 +31,10 @@ dev = [
 
 [project.scripts]
 financial-agent = "financial_agent.main:main"
+financial-agent-review = "financial_agent.review_main:main"
+financial-agent-watchlist = "financial_agent.watchlist_main:main"
+financial-agent-screener = "financial_agent.screener_main:main"
+financial-agent-performance = "financial_agent.performance_main:main"
 
 [tool.ruff]
 target-version = "py311"

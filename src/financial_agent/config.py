@@ -43,6 +43,53 @@ class AIConfig(BaseSettings):
     )
 
 
+class DataConfig(BaseSettings):
+    """External data provider configuration. API keys are optional."""
+
+    model_config = {"env_prefix": "DATA_"}
+
+    fmp_api_key: str = Field(
+        default="",
+        description="Financial Modeling Prep API key for fundamentals/earnings.",
+    )
+    finnhub_api_key: str = Field(
+        default="",
+        description="Finnhub API key for news/sentiment.",
+    )
+    data_dir: str = Field(
+        default=".data",
+        description="Directory for persistent data (theses, equity history, trade journal).",
+    )
+    earnings_buffer_days: int = Field(
+        default=3,
+        description="Avoid opening positions within N days of earnings.",
+    )
+    max_sector_pct: float = Field(
+        default=0.30,
+        description="Max portfolio allocation to any single sector.",
+    )
+    trailing_stop_atr_multiplier: float = Field(
+        default=2.0,
+        description="Trailing stop distance as multiple of ATR.",
+    )
+    slippage_tolerance_pct: float = Field(
+        default=0.002,
+        description="Max slippage for limit orders (0.2%).",
+    )
+    use_limit_orders: bool = Field(
+        default=True,
+        description="Use limit orders instead of market orders.",
+    )
+    enable_position_scaling: bool = Field(
+        default=True,
+        description="Enable partial entry/exit scaling.",
+    )
+    risk_budget_pct: float = Field(
+        default=0.02,
+        description="Target risk per position as fraction of equity.",
+    )
+
+
 class TradingConfig(BaseSettings):
     """Trading strategy parameters. All from GitHub Variables."""
 
@@ -78,15 +125,41 @@ class TradingConfig(BaseSettings):
     )
     stock_universe: str = Field(
         default=(
-            "AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ,"
-            "UNH,HD,PG,MA,DIS,NFLX,ADBE,CRM,COST,PEP,"
-            "AMD,INTC,QCOM,AVGO,ORCL,CSCO,IBM,NOW,UBER,SQ,"
-            "BA,CAT,GE,MMM,LMT,RTX,GS,MS,BRK.B,WMT"
+            # Technology (15)
+            "AAPL,MSFT,GOOGL,NVDA,META,AVGO,ADBE,CRM,ORCL,CSCO,"
+            "INTC,AMD,QCOM,NOW,IBM,"
+            # Consumer Discretionary (10)
+            "AMZN,TSLA,HD,NFLX,COST,NKE,MCD,SBUX,TJX,BKNG,"
+            # Financials (10)
+            "JPM,V,MA,GS,MS,BRK.B,BAC,WFC,BLK,SCHW,"
+            # Healthcare (10)
+            "UNH,JNJ,LLY,PFE,ABT,TMO,ABBV,MRK,AMGN,ISRG,"
+            # Industrials (10)
+            "BA,CAT,GE,MMM,LMT,RTX,UPS,HON,DE,UNP,"
+            # Communication Services (5)
+            "GOOG,DIS,CMCSA,T,VZ,"
+            # Energy (8)
+            "XOM,CVX,COP,SLB,EOG,MPC,PSX,OXY,"
+            # Utilities (5)
+            "NEE,SO,DUK,D,AEP,"
+            # Real Estate (5)
+            "AMT,PLD,CCI,EQIX,SPG,"
+            # Materials (5)
+            "LIN,APD,SHW,ECL,FCX,"
+            # Consumer Staples (7)
+            "PG,PEP,KO,WMT,PM,MO,CL,"
+            # Sector ETFs & Benchmarks (8)
+            "SPY,QQQ,XLK,XLF,XLE,XLV,XLI,IWM,"
+            # International ADRs (5)
+            "TSM,ASML,NVO,BABA,SAP"
         ),
-        description="Broad screening universe for watchlist review.",
+        description="Broad screening universe covering all 11 GICS sectors + ETFs + ADRs.",
     )
     crypto_universe: str = Field(
-        default="BTC/USD,ETH/USD,SOL/USD,DOGE/USD,AVAX/USD,LINK/USD,DOT/USD,MATIC/USD,ADA/USD",
+        default=(
+            "BTC/USD,ETH/USD,SOL/USD,DOGE/USD,AVAX/USD,"
+            "LINK/USD,DOT/USD,MATIC/USD,ADA/USD,XRP/USD,ATOM/USD,UNI/USD"
+        ),
         description="Broad crypto screening universe (GitHub Variable: TRADING_CRYPTO_UNIVERSE)",
     )
     strategy: str = Field(
@@ -97,6 +170,10 @@ class TradingConfig(BaseSettings):
         default=False,
         description="If true, log trades but don't execute (GitHub Variable: TRADING_DRY_RUN)",
     )
+    historical_days: int = Field(
+        default=270,
+        description="Days of historical data to fetch (270 > 252 trading days = 1 year).",
+    )
 
 
 class AppConfig(BaseSettings):
@@ -105,6 +182,7 @@ class AppConfig(BaseSettings):
     broker: BrokerConfig = Field(default_factory=BrokerConfig)  # type: ignore[arg-type]
     ai: AIConfig = Field(default_factory=AIConfig)  # type: ignore[arg-type]
     trading: TradingConfig = Field(default_factory=TradingConfig)
+    data: DataConfig = Field(default_factory=DataConfig)
 
     log_level: str = Field(
         default="INFO",

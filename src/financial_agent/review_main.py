@@ -117,7 +117,8 @@ def main() -> None:
     all_crypto = list(set(crypto_watchlist + held_crypto))
 
     if all_crypto:
-        crypto_bars = broker.get_crypto_historical_bars(all_crypto, days=90)
+        hist_days = config.trading.historical_days
+        crypto_bars = broker.get_crypto_historical_bars(all_crypto, days=hist_days)
         crypto_technicals = technical.compute_indicators(crypto_bars)
         technicals.update(crypto_technicals)
 
@@ -127,7 +128,7 @@ def main() -> None:
 
     if all_stocks:
         try:
-            stock_bars = broker.get_historical_bars(all_stocks, days=90)
+            stock_bars = broker.get_historical_bars(all_stocks, days=hist_days)
             stock_technicals = technical.compute_indicators(stock_bars)
             technicals.update(stock_technicals)
         except Exception as e:

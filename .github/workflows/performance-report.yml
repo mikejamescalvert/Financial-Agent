@@ -1,0 +1,66 @@
+name: Performance Report
+
+on:
+  schedule:
+    # Run weekly on Saturday at 12 PM UTC
+    - cron: '0 12 * * 6'
+
+  workflow_dispatch:  # Allow manual trigger
+
+concurrency:
+  group: performance-report
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    name: Generate Performance Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Only run on the main branch
+    if: github.ref == 'refs/heads/main'
+
+    environment: trading
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Restore persistent data
+        uses: actions/cache@v4
+        with:
+          path: .data
+          key: agent-data-${{ github.run_id }}
+          restore-keys: |
+            agent-data-
+
+      - name: Generate performance report
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ALPACA_BASE_URL: ${{ vars.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets' }}
+          TRADING_DRY_RUN: 'true'
+          LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
+          GH_TOKEN: ${{ github.token }}
+        run: python -m financial_agent.performance_main
+
+      - name: Post summary
+        if: always()
+        run: |
+          echo "## Performance Report" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

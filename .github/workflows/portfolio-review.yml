@@ -39,6 +39,14 @@ jobs:
       - name: Install dependencies
         run: pip install -e .
 
+      - name: Restore persistent data
+        uses: actions/cache@v4
+        with:
+          path: .data
+          key: agent-data-${{ github.run_id }}
+          restore-keys: |
+            agent-data-
+
       - name: Run portfolio review
         id: review
         env:
@@ -62,6 +70,13 @@ jobs:
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
           GH_TOKEN: ${{ github.token }}
         run: python -m financial_agent.review_main
+
+      - name: Save persistent data
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .data
+          key: agent-data-${{ github.run_id }}
 
       - name: Post summary
         if: always()
