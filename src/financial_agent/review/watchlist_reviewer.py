@@ -91,7 +91,7 @@ class WatchlistReviewer:
             messages=[{"role": "user", "content": prompt}],
         )
 
-        raw_text = response.content[0].text
+        raw_text = response.content[0].text  # type: ignore[union-attr]
         result = self._parse_response(raw_text)
 
         log.info(

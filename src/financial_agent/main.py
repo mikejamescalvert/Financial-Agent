@@ -128,7 +128,7 @@ def _normalize_crypto_symbol(symbol: str) -> str:
     return symbol
 
 
-def _write_github_output(summary: dict) -> None:
+def _write_github_output(summary: dict[str, object]) -> None:
     """Write summary to GITHUB_OUTPUT for use in subsequent workflow steps."""
     import os
 

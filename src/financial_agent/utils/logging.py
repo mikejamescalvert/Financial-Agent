@@ -9,7 +9,7 @@ import structlog
 
 def setup_logging(level: str = "INFO") -> None:
     """Configure structured logging for the application."""
-    numeric_level = getattr(logging, level.upper(), logging.INFO)
+    numeric_level: int = getattr(logging, level.upper(), logging.INFO)
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
