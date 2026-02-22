@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDataClient
@@ -37,7 +37,7 @@ class AlpacaBroker:
 
     def get_account_info(self) -> dict[str, Any]:
         """Get account balance and status."""
-        account = self._trading.get_account()
+        account: Any = self._trading.get_account()
         return {
             "equity": float(account.equity),
             "cash": float(account.cash),
@@ -49,7 +49,7 @@ class AlpacaBroker:
 
     def get_positions(self) -> list[Position]:
         """Get all current positions."""
-        raw_positions = self._trading.get_all_positions()
+        raw_positions: Any = self._trading.get_all_positions()
         positions = []
         for p in raw_positions:
             asset_cls = (
@@ -96,8 +96,8 @@ class AlpacaBroker:
             timeframe=timeframe,
             start=datetime.now() - timedelta(days=days),
         )
-        bars = self._data.get_stock_bars(request)
-        return bars.df
+        bars: Any = self._data.get_stock_bars(request)
+        return cast("pd.DataFrame", bars.df)
 
     def get_crypto_historical_bars(
         self,
@@ -111,8 +111,8 @@ class AlpacaBroker:
             timeframe=timeframe,
             start=datetime.now() - timedelta(days=days),
         )
-        bars = self._crypto_data.get_crypto_bars(request)
-        return bars.df
+        bars: Any = self._crypto_data.get_crypto_bars(request)
+        return cast("pd.DataFrame", bars.df)
 
     def submit_order(self, order: TradeOrder, dry_run: bool = True) -> dict[str, Any]:
         """Submit a trade order. Returns order details."""
@@ -136,7 +136,7 @@ class AlpacaBroker:
             type=OrderType.MARKET,
             time_in_force=tif,
         )
-        result = self._trading.submit_order(request)
+        result: Any = self._trading.submit_order(request)
         log.info("order_executed", order_id=result.id, status=result.status)
         return {
             "status": str(result.status),
@@ -148,5 +148,5 @@ class AlpacaBroker:
 
     def is_market_open(self) -> bool:
         """Check if the market is currently open."""
-        clock = self._trading.get_clock()
-        return clock.is_open
+        clock: Any = self._trading.get_clock()
+        return cast("bool", clock.is_open)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import ta
+import ta  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     import pandas as pd

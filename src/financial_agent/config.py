@@ -102,8 +102,8 @@ class TradingConfig(BaseSettings):
 class AppConfig(BaseSettings):
     """Top-level application configuration."""
 
-    broker: BrokerConfig = Field(default_factory=BrokerConfig)
-    ai: AIConfig = Field(default_factory=AIConfig)
+    broker: BrokerConfig = Field(default_factory=BrokerConfig)  # type: ignore[arg-type]
+    ai: AIConfig = Field(default_factory=AIConfig)  # type: ignore[arg-type]
     trading: TradingConfig = Field(default_factory=TradingConfig)
 
     log_level: str = Field(
