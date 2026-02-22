@@ -54,7 +54,7 @@ def main() -> None:
 
     # Step 3a: Crypto pipeline (always runs)
     crypto_watchlist = [s.strip() for s in config.trading.crypto_watchlist.split(",")]
-    held_crypto = [p.symbol for p in portfolio.crypto_positions()]
+    held_crypto = [_normalize_crypto_symbol(p.symbol) for p in portfolio.crypto_positions()]
     all_crypto = list(set(crypto_watchlist + held_crypto))
 
     if all_crypto:
@@ -113,6 +113,19 @@ def main() -> None:
 
     # Write summary to GitHub Actions output if available
     _write_github_output(summary)
+
+
+def _normalize_crypto_symbol(symbol: str) -> str:
+    """Normalize crypto symbols to the 'XXX/YYY' format required by the data API.
+
+    Alpaca positions use 'BTCUSD' but the crypto data API requires 'BTC/USD'.
+    """
+    if "/" in symbol:
+        return symbol
+    # Crypto pairs always end in USD — split before the currency suffix
+    if symbol.endswith("USD"):
+        return symbol[:-3] + "/USD"
+    return symbol
 
 
 def _write_github_output(summary: dict) -> None:

@@ -1,10 +1,11 @@
-"""Tests for the Alpaca broker client."""
+"""Tests for the Alpaca broker client and crypto symbol handling."""
 
 from unittest.mock import MagicMock
 
 from alpaca.trading.enums import TimeInForce
 
 from financial_agent.broker.alpaca_client import AlpacaBroker
+from financial_agent.main import _normalize_crypto_symbol
 from financial_agent.portfolio.models import AssetClass, TradeOrder
 
 
@@ -96,3 +97,20 @@ class TestGetPositionsAssetClass:
         positions = broker.get_positions()
         assert len(positions) == 1
         assert positions[0].asset_class == AssetClass.US_EQUITY
+
+
+class TestNormalizeCryptoSymbol:
+    def test_already_normalized(self):
+        assert _normalize_crypto_symbol("BTC/USD") == "BTC/USD"
+
+    def test_btcusd_normalized(self):
+        assert _normalize_crypto_symbol("BTCUSD") == "BTC/USD"
+
+    def test_ethusd_normalized(self):
+        assert _normalize_crypto_symbol("ETHUSD") == "ETH/USD"
+
+    def test_solusd_normalized(self):
+        assert _normalize_crypto_symbol("SOLUSD") == "SOL/USD"
+
+    def test_non_usd_passthrough(self):
+        assert _normalize_crypto_symbol("BTCEUR") == "BTCEUR"
