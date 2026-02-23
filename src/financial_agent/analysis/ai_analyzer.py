@@ -46,7 +46,8 @@ growth, high debt, poor margins) unless there's a clear technical catalyst.
 - If a position's original trade thesis is invalidated, recommend SELL regardless of P/L.
 
 ## Crypto-specific rules
-- Crypto symbols contain "/" (e.g., BTC/USD, ETH/USD). Stock symbols do not.
+- Crypto symbols may contain "/" (e.g., BTC/USD) or appear as concatenated (e.g., BTCUSD). \
+Always include "asset_class": "crypto" for any crypto signal. Stock symbols do not contain "/".
 - Crypto trades 24/7 — there is no market close.
 - Crypto is more volatile — use wider stop losses (8-15% vs 3-5%).
 - Treat crypto and stock allocations as separate buckets for diversification.
@@ -72,7 +73,8 @@ Respond ONLY with valid JSON matching this schema:
       "target_weight": 0.05,
       "stop_loss": 150.00,
       "take_profit": 200.00,
-      "scale_action": ""
+      "scale_action": "",
+      "asset_class": "us_equity or crypto"
     }
   ]
 }
@@ -320,7 +322,13 @@ class AIAnalyzer:
         for entry in data.get("signals", []):
             try:
                 symbol = entry["symbol"]
-                asset_cls = AssetClass.CRYPTO if "/" in symbol else AssetClass.US_EQUITY
+                # Detect crypto: "/" in symbol (SOL/USD) or AI-provided asset_class
+                ai_asset = entry.get("asset_class", "")
+                asset_cls = (
+                    AssetClass.CRYPTO
+                    if "/" in symbol or ai_asset == "crypto"
+                    else AssetClass.US_EQUITY
+                )
                 signals.append(
                     TradeSignal(
                         symbol=symbol,
