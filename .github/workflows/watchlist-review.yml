@@ -15,7 +15,6 @@ concurrency:
 permissions:
   contents: read
   issues: write
-  variables: write
 
 jobs:
   review:
@@ -73,7 +72,7 @@ jobs:
           TRADING_HISTORICAL_DAYS: ${{ vars.TRADING_HISTORICAL_DAYS || '270' }}
           TRADING_DRY_RUN: 'true'
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: python -m financial_agent.watchlist_main
 
       - name: Save persistent data
