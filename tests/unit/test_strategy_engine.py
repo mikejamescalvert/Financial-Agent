@@ -201,3 +201,33 @@ class TestStrategyEngine:
         assert len(orders) == 1
         assert orders[0].asset_class == AssetClass.CRYPTO
         assert orders[0].side == "sell"
+
+    def test_sell_qty_clamped_for_fractional_crypto(self):
+        """Rounding can produce sell_qty > position.qty for small crypto holdings."""
+        engine = StrategyEngine(_make_config())
+        # 0.00945 * 0.95 = 0.008978, rounds to 0.01 which exceeds 0.00945
+        portfolio = _make_portfolio(
+            positions=[
+                Position(
+                    symbol="BTC/USD",
+                    qty=0.00945,
+                    avg_entry_price=50000.0,
+                    current_price=55000.0,
+                    market_value=519.75,
+                    unrealized_pl=47.25,
+                    unrealized_pl_pct=0.1,
+                    asset_class=AssetClass.CRYPTO,
+                )
+            ]
+        )
+        signal = TradeSignal(
+            symbol="BTC/USD",
+            signal=SignalType.SELL,
+            confidence=0.95,
+            reason="Exit crypto",
+            asset_class=AssetClass.CRYPTO,
+        )
+        orders = engine.generate_orders([signal], portfolio)
+        assert len(orders) == 1
+        assert orders[0].qty <= 0.00945
+        assert orders[0].qty == 0.00945  # Clamped to actual position
