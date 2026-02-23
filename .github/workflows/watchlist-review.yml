@@ -2,8 +2,9 @@ name: Watchlist Review
 
 on:
   schedule:
-    # Run weekly on Sunday at 6 PM UTC (before Monday open)
-    - cron: '0 18 * * 0'
+    # Run daily at 1 AM UTC (after market close, before next session)
+    # Changed from weekly to daily per Issue #24
+    - cron: '0 1 * * *'
 
   workflow_dispatch:  # Allow manual trigger
 
@@ -14,7 +15,6 @@ concurrency:
 permissions:
   contents: read
   issues: write
-  variables: write
 
 jobs:
   review:
@@ -40,6 +40,14 @@ jobs:
       - name: Install dependencies
         run: pip install -e .
 
+      - name: Restore persistent data
+        uses: actions/cache@v5
+        with:
+          path: .data
+          key: agent-data-${{ github.run_id }}
+          restore-keys: |
+            agent-data-
+
       - name: Run watchlist review
         id: review
         env:
@@ -61,10 +69,18 @@ jobs:
           TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.15' }}
           TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.10' }}
           TRADING_MAX_DAILY_TRADES: ${{ vars.TRADING_MAX_DAILY_TRADES || '10' }}
+          TRADING_HISTORICAL_DAYS: ${{ vars.TRADING_HISTORICAL_DAYS || '270' }}
           TRADING_DRY_RUN: 'true'
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: python -m financial_agent.watchlist_main
+
+      - name: Save persistent data
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: .data
+          key: agent-data-${{ github.run_id }}
 
       - name: Post summary
         if: always()

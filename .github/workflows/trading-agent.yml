@@ -59,6 +59,14 @@ jobs:
       - name: Install dependencies
         run: pip install -e .
 
+      - name: Restore persistent data
+        uses: actions/cache@v5
+        with:
+          path: .data
+          key: agent-data-${{ github.run_id }}
+          restore-keys: |
+            agent-data-
+
       - name: Run trading agent
         id: agent
         env:
@@ -79,8 +87,27 @@ jobs:
           TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD,SOL/USD' }}
           TRADING_STRATEGY: ${{ inputs.strategy || vars.TRADING_STRATEGY || 'balanced' }}
           TRADING_DRY_RUN: ${{ inputs.dry_run || vars.TRADING_DRY_RUN || 'false' }}
+          TRADING_HISTORICAL_DAYS: ${{ vars.TRADING_HISTORICAL_DAYS || '270' }}
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
+
+          # Data provider keys (optional — features degrade gracefully without them)
+          DATA_FMP_API_KEY: ${{ secrets.DATA_FMP_API_KEY || '' }}
+          DATA_FINNHUB_API_KEY: ${{ secrets.DATA_FINNHUB_API_KEY || '' }}
+          DATA_EARNINGS_BUFFER_DAYS: ${{ vars.DATA_EARNINGS_BUFFER_DAYS || '3' }}
+          DATA_MAX_SECTOR_PCT: ${{ vars.DATA_MAX_SECTOR_PCT || '0.30' }}
+          DATA_TRAILING_STOP_ATR_MULTIPLIER: ${{ vars.DATA_TRAILING_STOP_ATR_MULTIPLIER || '2.0' }}
+          DATA_SLIPPAGE_TOLERANCE_PCT: ${{ vars.DATA_SLIPPAGE_TOLERANCE_PCT || '0.002' }}
+          DATA_USE_LIMIT_ORDERS: ${{ vars.DATA_USE_LIMIT_ORDERS || 'true' }}
+          DATA_ENABLE_POSITION_SCALING: ${{ vars.DATA_ENABLE_POSITION_SCALING || 'true' }}
+          DATA_RISK_BUDGET_PCT: ${{ vars.DATA_RISK_BUDGET_PCT || '0.02' }}
         run: python -m financial_agent.main
+
+      - name: Save persistent data
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: .data
+          key: agent-data-${{ github.run_id }}
 
       - name: Post failure summary
         if: failure()

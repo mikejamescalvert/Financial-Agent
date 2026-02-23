@@ -1,14 +1,14 @@
-name: Portfolio Review
+name: Daily Screener
 
 on:
   schedule:
-    # Run daily at 9 PM UTC (after US market close at 4 PM ET)
-    - cron: '0 21 * * *'
+    # Run daily at 1 PM UTC (before US market open at 9:30 AM ET / 1:30 PM UTC)
+    - cron: '0 13 * * 1-5'
 
   workflow_dispatch:  # Allow manual trigger
 
 concurrency:
-  group: portfolio-review
+  group: daily-screener
   cancel-in-progress: true
 
 permissions:
@@ -16,10 +16,10 @@ permissions:
   issues: write
 
 jobs:
-  review:
-    name: Review Portfolio & Create Issues
+  screen:
+    name: Pre-Market Screen
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     # Only run on the main branch
     if: github.ref == 'refs/heads/main'
@@ -47,40 +47,23 @@ jobs:
           restore-keys: |
             agent-data-
 
-      - name: Run portfolio review
-        id: review
+      - name: Run daily screener
         env:
-          # Secrets
           ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-
-          # Configuration (reuses trading variables)
           ALPACA_BASE_URL: ${{ vars.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets' }}
-          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514' }}
-          TRADING_MAX_POSITION_PCT: ${{ vars.TRADING_MAX_POSITION_PCT || '0.10' }}
-          TRADING_MAX_DAILY_TRADES: ${{ vars.TRADING_MAX_DAILY_TRADES || '10' }}
-          TRADING_STOP_LOSS_PCT: ${{ vars.TRADING_STOP_LOSS_PCT || '0.05' }}
-          TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.15' }}
-          TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.10' }}
+          TRADING_STOCK_UNIVERSE: ${{ vars.TRADING_STOCK_UNIVERSE || '' }}
           TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ' }}
-          TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD,SOL/USD' }}
-          TRADING_STRATEGY: ${{ vars.TRADING_STRATEGY || 'balanced' }}
-          TRADING_DRY_RUN: 'true'  # Review agent never trades
+          TRADING_HISTORICAL_DAYS: ${{ vars.TRADING_HISTORICAL_DAYS || '270' }}
+          TRADING_DRY_RUN: 'true'
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
           GH_TOKEN: ${{ github.token }}
-        run: python -m financial_agent.review_main
-
-      - name: Save persistent data
-        if: always()
-        uses: actions/cache/save@v5
-        with:
-          path: .data
-          key: agent-data-${{ github.run_id }}
+        run: python -m financial_agent.screener_main
 
       - name: Post summary
         if: always()
         run: |
-          echo "## Portfolio Review" >> $GITHUB_STEP_SUMMARY
+          echo "## Daily Screener" >> $GITHUB_STEP_SUMMARY
           echo "- **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY

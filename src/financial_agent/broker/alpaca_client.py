@@ -11,9 +11,17 @@ from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, OrderType, TimeInForce
-from alpaca.trading.requests import MarketOrderRequest
+from alpaca.trading.requests import LimitOrderRequest, MarketOrderRequest
 
-from financial_agent.portfolio.models import AssetClass, PortfolioSnapshot, Position, TradeOrder
+from financial_agent.portfolio.models import (
+    AssetClass,
+    PortfolioSnapshot,
+    Position,
+    TradeOrder,
+)
+from financial_agent.portfolio.models import (
+    OrderType as OType,
+)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -115,12 +123,14 @@ class AlpacaBroker:
         return cast("pd.DataFrame", bars.df)
 
     def submit_order(self, order: TradeOrder, dry_run: bool = True) -> dict[str, Any]:
-        """Submit a trade order. Returns order details."""
+        """Submit a trade order. Supports market and limit orders."""
         log.info(
             "order_submitted",
             symbol=order.symbol,
             side=order.side,
             qty=order.qty,
+            order_type=order.order_type.value,
+            limit_price=order.limit_price,
             dry_run=dry_run,
         )
 
@@ -128,14 +138,33 @@ class AlpacaBroker:
             log.info("dry_run_order", order=order.model_dump())
             return {"status": "dry_run", "order": order.model_dump()}
 
-        tif = TimeInForce.GTC if order.asset_class == AssetClass.CRYPTO else TimeInForce.DAY
-        request = MarketOrderRequest(
-            symbol=order.symbol,
-            qty=order.qty,
-            side=OrderSide.BUY if order.side == "buy" else OrderSide.SELL,
-            type=OrderType.MARKET,
-            time_in_force=tif,
+        # Detect crypto: check asset_class or symbol pattern (e.g. SOLUSD, BTC/USD)
+        is_crypto = (
+            order.asset_class == AssetClass.CRYPTO
+            or "/" in order.symbol
+            or order.symbol.endswith("USD")
         )
+        tif = TimeInForce.GTC if is_crypto else TimeInForce.DAY
+        side = OrderSide.BUY if order.side == "buy" else OrderSide.SELL
+
+        if order.order_type == OType.LIMIT and order.limit_price is not None:
+            request: Any = LimitOrderRequest(
+                symbol=order.symbol,
+                qty=order.qty,
+                side=side,
+                type=OrderType.LIMIT,
+                time_in_force=tif,
+                limit_price=order.limit_price,
+            )
+        else:
+            request = MarketOrderRequest(
+                symbol=order.symbol,
+                qty=order.qty,
+                side=side,
+                type=OrderType.MARKET,
+                time_in_force=tif,
+            )
+
         result: Any = self._trading.submit_order(request)
         log.info("order_executed", order_id=result.id, status=result.status)
         return {
@@ -144,6 +173,7 @@ class AlpacaBroker:
             "symbol": result.symbol,
             "qty": str(result.qty),
             "side": str(result.side),
+            "type": order.order_type.value,
         }
 
     def is_market_open(self) -> bool:
