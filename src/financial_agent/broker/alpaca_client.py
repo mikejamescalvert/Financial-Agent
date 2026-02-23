@@ -165,7 +165,24 @@ class AlpacaBroker:
                 time_in_force=tif,
             )
 
-        result: Any = self._trading.submit_order(request)
+        try:
+            result: Any = self._trading.submit_order(request)
+        except Exception:
+            log.error(
+                "order_submission_failed",
+                symbol=order.symbol,
+                side=order.side,
+                qty=order.qty,
+                exc_info=True,
+            )
+            return {
+                "status": "failed",
+                "symbol": order.symbol,
+                "qty": str(order.qty),
+                "side": order.side,
+                "type": order.order_type.value,
+            }
+
         log.info("order_executed", order_id=result.id, status=result.status)
         return {
             "status": str(result.status),

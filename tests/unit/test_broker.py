@@ -60,6 +60,20 @@ class TestSubmitOrderTimeInForce:
         assert result["status"] == "dry_run"
         broker._trading.submit_order.assert_not_called()
 
+    def test_submission_error_returns_failed_status(self):
+        broker = _make_broker()
+        broker._trading.submit_order.side_effect = Exception("insufficient balance")
+        order = TradeOrder(
+            symbol="BTC/USD",
+            side="sell",
+            qty=0.01,
+            reason="test",
+            asset_class=AssetClass.CRYPTO,
+        )
+        result = broker.submit_order(order, dry_run=False)
+        assert result["status"] == "failed"
+        assert result["symbol"] == "BTC/USD"
+
 
 class TestGetPositionsAssetClass:
     def test_crypto_position_detected(self):

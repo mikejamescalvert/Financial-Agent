@@ -165,6 +165,11 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         result = broker.submit_order(order, dry_run=config.trading.dry_run)
         results.append(result)
 
+        # Only record successful trades
+        if result.get("status") == "failed":
+            log.warning("order_failed_skipping_record", symbol=order.symbol)
+            continue
+
         # Record trade and update thesis (Issues #27, #20)
         _record_trade(order, result, thesis_store, perf_tracker, signals)
 

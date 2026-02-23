@@ -273,6 +273,16 @@ class StrategyEngine:
             # Sell quantity scaled by confidence
             sell_qty = round(position.qty * signal.confidence, 2)
 
+        # Clamp to actual position size — rounding can exceed it for small crypto quantities
+        if sell_qty > position.qty:
+            log.warning(
+                "sell_qty_clamped",
+                symbol=signal.symbol,
+                computed=sell_qty,
+                available=position.qty,
+            )
+            sell_qty = position.qty
+
         if sell_qty <= 0:
             return None
 
