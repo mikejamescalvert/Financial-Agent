@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 log = structlog.get_logger()
 
-_FMP_BASE = "https://financialmodelingprep.com/api/v3"
+_FMP_BASE = "https://financialmodelingprep.com/stable"
 
 
 class EarningsProvider:
@@ -46,7 +46,7 @@ class EarningsProvider:
         from_date = today.isoformat()
         to_date = (today + timedelta(days=14)).isoformat()
 
-        url = f"{_FMP_BASE}/earning_calendar?from={from_date}&to={to_date}&apikey={self._api_key}"
+        url = f"{_FMP_BASE}/earnings-calendar?from={from_date}&to={to_date}&apikey={self._api_key}"
         req = urllib.request.Request(url)  # noqa: S310
         req.add_header("User-Agent", "FinancialAgent/1.0")
 
