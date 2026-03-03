@@ -53,6 +53,9 @@ class EarningsProvider:
         with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
             body = json.loads(resp.read().decode())
 
+        # Handle dict response (FMP stable API may return a single object)
+        if isinstance(body, dict):
+            body = [body]
         if not isinstance(body, list):
             log.warning("earnings_unexpected_response", body_type=type(body).__name__)
             return []
