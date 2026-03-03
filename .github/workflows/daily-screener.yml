@@ -53,7 +53,6 @@ jobs:
           ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ALPACA_BASE_URL: ${{ vars.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets' }}
-          TRADING_STOCK_UNIVERSE: ${{ vars.TRADING_STOCK_UNIVERSE || '' }}
           TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ' }}
           TRADING_HISTORICAL_DAYS: ${{ vars.TRADING_HISTORICAL_DAYS || '270' }}
           TRADING_DRY_RUN: 'true'
