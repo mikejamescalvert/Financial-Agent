@@ -159,13 +159,37 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     orders = engine.generate_orders(all_signals, portfolio, technicals, enrichment)
     log.info("orders_generated", count=len(orders))
 
-    # Step 8: Cancel pending orders for symbols we're about to trade, then execute
+    # Step 8: Cancel pending orders and filter for PDT protection, then execute
     if not config.trading.dry_run:
         symbols_to_trade = {o.symbol for o in orders}
         for sym in symbols_to_trade:
             cancelled = broker.cancel_pending_orders(sym)
             if cancelled:
                 log.info("stale_orders_cancelled", symbol=sym, count=cancelled)
+
+        # PDT protection: block orders that would create a day trade
+        # (buying and selling the same symbol on the same day)
+        todays_fills = broker.get_todays_filled_sides()
+        _opposite = {"buy": "sell", "sell": "buy"}
+        safe_orders: list[TradeOrder] = []
+        for order in orders:
+            filled_sides = todays_fills.get(order.symbol, set())
+            if _opposite.get(order.side, "") in filled_sides:
+                log.warning(
+                    "order_blocked_pdt",
+                    symbol=order.symbol,
+                    side=order.side,
+                    reason="opposite side already filled today",
+                )
+            else:
+                safe_orders.append(order)
+        if len(safe_orders) < len(orders):
+            log.info(
+                "pdt_filter_applied",
+                original=len(orders),
+                allowed=len(safe_orders),
+            )
+        orders = safe_orders
 
     results = []
     for order in orders:
