@@ -113,6 +113,73 @@ class TestGetPositionsAssetClass:
         assert positions[0].asset_class == AssetClass.US_EQUITY
 
 
+class TestPendingOrderManagement:
+    def test_get_pending_orders_returns_open_orders(self):
+        broker = _make_broker()
+        mock_order = MagicMock()
+        mock_order.id = "order-123"
+        mock_order.symbol = "AAPL"
+        mock_order.side = "buy"
+        mock_order.qty = "5"
+        mock_order.type = "limit"
+        mock_order.status = "new"
+        broker._trading.get_orders.return_value = [mock_order]
+
+        orders = broker.get_pending_orders("AAPL")
+        assert len(orders) == 1
+        assert orders[0]["id"] == "order-123"
+        assert orders[0]["symbol"] == "AAPL"
+
+    def test_get_pending_orders_handles_exception(self):
+        broker = _make_broker()
+        broker._trading.get_orders.side_effect = Exception("API error")
+        orders = broker.get_pending_orders("AAPL")
+        assert orders == []
+
+    def test_cancel_pending_orders_cancels_all(self):
+        broker = _make_broker()
+        mock_order1 = MagicMock()
+        mock_order1.id = "order-1"
+        mock_order1.symbol = "XOM"
+        mock_order1.side = "buy"
+        mock_order1.qty = "0.12"
+        mock_order1.type = "limit"
+        mock_order1.status = "new"
+        mock_order2 = MagicMock()
+        mock_order2.id = "order-2"
+        mock_order2.symbol = "XOM"
+        mock_order2.side = "buy"
+        mock_order2.qty = "0.11"
+        mock_order2.type = "limit"
+        mock_order2.status = "new"
+        broker._trading.get_orders.return_value = [mock_order1, mock_order2]
+
+        cancelled = broker.cancel_pending_orders("XOM")
+        assert cancelled == 2
+        assert broker._trading.cancel_order_by_id.call_count == 2
+
+    def test_cancel_pending_orders_handles_partial_failure(self):
+        broker = _make_broker()
+        mock_order = MagicMock()
+        mock_order.id = "order-1"
+        mock_order.symbol = "AAPL"
+        mock_order.side = "buy"
+        mock_order.qty = "1"
+        mock_order.type = "limit"
+        mock_order.status = "new"
+        broker._trading.get_orders.return_value = [mock_order]
+        broker._trading.cancel_order_by_id.side_effect = Exception("already filled")
+
+        cancelled = broker.cancel_pending_orders("AAPL")
+        assert cancelled == 0
+
+    def test_cancel_pending_orders_with_no_pending(self):
+        broker = _make_broker()
+        broker._trading.get_orders.return_value = []
+        cancelled = broker.cancel_pending_orders("AAPL")
+        assert cancelled == 0
+
+
 class TestNormalizeCryptoSymbol:
     def test_already_normalized(self):
         assert _normalize_crypto_symbol("BTC/USD") == "BTC/USD"

@@ -10,8 +10,8 @@ from alpaca.data.historical import CryptoHistoricalDataClient, StockHistoricalDa
 from alpaca.data.requests import CryptoBarsRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from alpaca.trading.client import TradingClient
-from alpaca.trading.enums import OrderSide, OrderType, TimeInForce
-from alpaca.trading.requests import LimitOrderRequest, MarketOrderRequest
+from alpaca.trading.enums import OrderSide, OrderType, QueryOrderStatus, TimeInForce
+from alpaca.trading.requests import GetOrdersRequest, LimitOrderRequest, MarketOrderRequest
 
 from financial_agent.portfolio.models import (
     AssetClass,
@@ -121,6 +121,54 @@ class AlpacaBroker:
         )
         bars: Any = self._crypto_data.get_crypto_bars(request)
         return cast("pd.DataFrame", bars.df)
+
+    def get_pending_orders(self, symbol: str | None = None) -> list[dict[str, Any]]:
+        """Get open (pending/partially filled) orders, optionally filtered by symbol."""
+        try:
+            request = GetOrdersRequest(status=QueryOrderStatus.OPEN)
+            if symbol:
+                request = GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=[symbol])
+            raw_orders: Any = self._trading.get_orders(request)
+            results = []
+            for o in raw_orders:
+                results.append(
+                    {
+                        "id": str(o.id),
+                        "symbol": o.symbol,
+                        "side": str(o.side),
+                        "qty": str(o.qty),
+                        "type": str(o.type),
+                        "status": str(o.status),
+                    }
+                )
+            return results
+        except Exception:
+            log.warning("get_pending_orders_failed", symbol=symbol, exc_info=True)
+            return []
+
+    def cancel_pending_orders(self, symbol: str) -> int:
+        """Cancel all open orders for a given symbol. Returns count cancelled."""
+        pending = self.get_pending_orders(symbol)
+        cancelled = 0
+        for order in pending:
+            try:
+                self._trading.cancel_order_by_id(order["id"])
+                cancelled += 1
+                log.info(
+                    "pending_order_cancelled",
+                    symbol=symbol,
+                    order_id=order["id"],
+                    side=order["side"],
+                    qty=order["qty"],
+                )
+            except Exception:
+                log.warning(
+                    "cancel_order_failed",
+                    symbol=symbol,
+                    order_id=order["id"],
+                    exc_info=True,
+                )
+        return cancelled
 
     def submit_order(self, order: TradeOrder, dry_run: bool = True) -> dict[str, Any]:
         """Submit a trade order. Supports market and limit orders."""

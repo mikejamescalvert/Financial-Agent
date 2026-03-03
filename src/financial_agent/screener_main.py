@@ -58,6 +58,11 @@ def main() -> None:
 
     log.info("screening_universe", total=len(stock_universe))
 
+    if not stock_universe:
+        log.info("screener_skip", reason="empty stock universe")
+        _write_github_output({"alerts": 0})
+        return
+
     # Fetch technical data for full universe
     try:
         bars = broker.get_historical_bars(stock_universe, days=config.trading.historical_days)

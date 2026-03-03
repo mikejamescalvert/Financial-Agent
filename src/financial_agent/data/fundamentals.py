@@ -50,7 +50,7 @@ class FundamentalsProvider:
         return results
 
     def _fetch_json(self, endpoint: str, params: str = "") -> list[dict[str, object]]:
-        """Fetch a JSON array from an FMP stable endpoint."""
+        """Fetch JSON from an FMP stable endpoint. Handles both dict and list responses."""
         url = f"{_FMP_BASE}/{endpoint}?{params}&apikey={self._api_key}"
         req = urllib.request.Request(url)  # noqa: S310
         req.add_header("User-Agent", "FinancialAgent/1.0")
@@ -58,9 +58,14 @@ class FundamentalsProvider:
         with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
             body = json.loads(resp.read().decode())
 
-        if not body or not isinstance(body, list) or len(body) == 0:
+        if not body:
             return []
-        return body  # type: ignore[no-any-return]
+        # /stable/profile returns a single dict; other endpoints return a list
+        if isinstance(body, dict):
+            return [body]
+        if not isinstance(body, list):
+            return []
+        return body
 
     def _fetch_fundamentals(self, symbol: str) -> FundamentalData | None:
         """Fetch a symbol's fundamentals from FMP stable endpoints.

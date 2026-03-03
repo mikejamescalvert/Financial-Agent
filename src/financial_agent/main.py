@@ -159,7 +159,14 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     orders = engine.generate_orders(all_signals, portfolio, technicals, enrichment)
     log.info("orders_generated", count=len(orders))
 
-    # Step 8: Execute orders
+    # Step 8: Cancel pending orders for symbols we're about to trade, then execute
+    if not config.trading.dry_run:
+        symbols_to_trade = {o.symbol for o in orders}
+        for sym in symbols_to_trade:
+            cancelled = broker.cancel_pending_orders(sym)
+            if cancelled:
+                log.info("stale_orders_cancelled", symbol=sym, count=cancelled)
+
     results = []
     for order in orders:
         result = broker.submit_order(order, dry_run=config.trading.dry_run)
