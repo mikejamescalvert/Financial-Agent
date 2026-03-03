@@ -180,6 +180,51 @@ class TestPendingOrderManagement:
         assert cancelled == 0
 
 
+class TestTodaysFilledSides:
+    def test_returns_filled_orders_grouped_by_symbol(self):
+        broker = _make_broker()
+        buy_order = MagicMock()
+        buy_order.status = "filled"
+        buy_order.symbol = "AAPL"
+        buy_order.side = "buy"
+        sell_order = MagicMock()
+        sell_order.status = "filled"
+        sell_order.symbol = "AAPL"
+        sell_order.side = "sell"
+        other_order = MagicMock()
+        other_order.status = "filled"
+        other_order.symbol = "JPM"
+        other_order.side = "buy"
+        broker._trading.get_orders.return_value = [buy_order, sell_order, other_order]
+
+        result = broker.get_todays_filled_sides()
+        assert result["AAPL"] == {"buy", "sell"}
+        assert result["JPM"] == {"buy"}
+
+    def test_skips_non_filled_orders(self):
+        broker = _make_broker()
+        cancelled_order = MagicMock()
+        cancelled_order.status = "canceled"
+        cancelled_order.symbol = "AAPL"
+        cancelled_order.side = "buy"
+        broker._trading.get_orders.return_value = [cancelled_order]
+
+        result = broker.get_todays_filled_sides()
+        assert result == {}
+
+    def test_returns_empty_on_exception(self):
+        broker = _make_broker()
+        broker._trading.get_orders.side_effect = Exception("API error")
+        result = broker.get_todays_filled_sides()
+        assert result == {}
+
+    def test_returns_empty_when_no_orders(self):
+        broker = _make_broker()
+        broker._trading.get_orders.return_value = []
+        result = broker.get_todays_filled_sides()
+        assert result == {}
+
+
 class TestNormalizeCryptoSymbol:
     def test_already_normalized(self):
         assert _normalize_crypto_symbol("BTC/USD") == "BTC/USD"

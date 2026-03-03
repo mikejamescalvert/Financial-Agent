@@ -122,6 +122,33 @@ class AlpacaBroker:
         bars: Any = self._crypto_data.get_crypto_bars(request)
         return cast("pd.DataFrame", bars.df)
 
+    def get_todays_filled_sides(self) -> dict[str, set[str]]:
+        """Get symbols and sides that have filled orders today.
+
+        Returns a dict like {"AAPL": {"buy"}, "JPM": {"buy", "sell"}}.
+        Used to detect potential day trades before submitting new orders.
+        """
+        try:
+            today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            request = GetOrdersRequest(
+                status=QueryOrderStatus.CLOSED,
+                after=today_start,
+                limit=200,
+            )
+            raw_orders: Any = self._trading.get_orders(request)
+            result: dict[str, set[str]] = {}
+            for o in raw_orders:
+                if str(o.status) == "filled":
+                    sym = o.symbol
+                    side = str(o.side)
+                    if sym not in result:
+                        result[sym] = set()
+                    result[sym].add(side)
+            return result
+        except Exception:
+            log.warning("get_todays_fills_failed", exc_info=True)
+            return {}
+
     def get_pending_orders(self, symbol: str | None = None) -> list[dict[str, Any]]:
         """Get open (pending/partially filled) orders, optionally filtered by symbol."""
         try:
