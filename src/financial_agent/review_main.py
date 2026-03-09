@@ -22,6 +22,121 @@ from financial_agent.strategy import TechnicalAnalyzer
 from financial_agent.utils.logging import setup_logging
 
 
+def _run_gh_command(cmd: list[str], timeout: int = 30) -> tuple[bool, str]:
+    """Run a gh CLI command and return (success, stdout)."""
+    try:
+        result = subprocess.run(  # noqa: S603, S607
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        return result.returncode == 0, result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False, ""
+
+
+def _get_open_review_categories() -> set[str]:
+    """Get the set of categories that already have open portfolio-review issues.
+
+    Returns category labels (e.g. 'risk', 'strategy', 'config') that have at least
+    one open issue, so we can skip creating duplicates.
+    """
+    log = structlog.get_logger()
+    success, output = _run_gh_command(
+        [
+            "gh",
+            "issue",
+            "list",
+            "--label",
+            "portfolio-review",
+            "--state",
+            "open",
+            "--limit",
+            "30",
+            "--json",
+            "labels",
+        ],
+    )
+    if not success or not output:
+        return set()
+
+    try:
+        issues = json.loads(output)
+    except json.JSONDecodeError:
+        return set()
+
+    # Extract category labels from existing open issues
+    category_labels = {"risk", "performance", "strategy", "config", "watchlist"}
+    existing: set[str] = set()
+    for issue in issues:
+        for label in issue.get("labels", []):
+            name = label.get("name", "") if isinstance(label, dict) else str(label)
+            if name in category_labels:
+                existing.add(name)
+
+    log.info("existing_review_categories", categories=sorted(existing), open_issues=len(issues))
+    return existing
+
+
+def _close_stale_review_issues() -> int:
+    """Close portfolio-review issues older than 5 days to prevent buildup."""
+    log = structlog.get_logger()
+    success, output = _run_gh_command(
+        [
+            "gh",
+            "issue",
+            "list",
+            "--label",
+            "portfolio-review",
+            "--state",
+            "open",
+            "--limit",
+            "100",
+            "--json",
+            "number,createdAt",
+        ],
+    )
+    if not success or not output:
+        return 0
+
+    try:
+        issues = json.loads(output)
+    except json.JSONDecodeError:
+        return 0
+
+    from datetime import UTC, datetime, timedelta
+
+    cutoff = datetime.now(tz=UTC) - timedelta(days=5)
+    closed = 0
+    for issue in issues:
+        created = issue.get("createdAt", "")
+        try:
+            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        if created_dt < cutoff:
+            num = issue["number"]
+            ok, _ = _run_gh_command(
+                [
+                    "gh",
+                    "issue",
+                    "close",
+                    str(num),
+                    "--reason",
+                    "not planned",
+                    "--comment",
+                    "Auto-closed: superseded by newer portfolio review.",
+                ],
+            )
+            if ok:
+                closed += 1
+
+    if closed:
+        log.info("stale_issues_closed", count=closed)
+    return closed
+
+
 def _create_github_issue(title: str, body: str, labels: list[str]) -> bool:
     """Create a GitHub issue using the gh CLI.
 
@@ -33,26 +148,12 @@ def _create_github_issue(title: str, body: str, labels: list[str]) -> bool:
     for label in labels:
         cmd.extend(["--label", label])
 
-    try:
-        result = subprocess.run(  # noqa: S603, S607
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if result.returncode == 0:
-            log.info("github_issue_created", title=title, url=result.stdout.strip())
-            return True
-        else:
-            log.error(
-                "github_issue_failed",
-                title=title,
-                stderr=result.stderr.strip(),
-                returncode=result.returncode,
-            )
-            return False
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        log.error("github_issue_error", title=title, error=str(e))
+    success, output = _run_gh_command(cmd)
+    if success:
+        log.info("github_issue_created", title=title, url=output)
+        return True
+    else:
+        log.error("github_issue_failed", title=title)
         return False
 
 
@@ -149,6 +250,12 @@ def main() -> None:
         _write_github_output({"grade": grade, "summary": summary, "issues_created": 0})
         return
 
+    # Close stale issues before creating new ones
+    _close_stale_review_issues()
+
+    # Check which categories already have open issues to avoid duplicates
+    existing_categories = _get_open_review_categories()
+
     # Ensure labels exist
     all_labels: set[str] = {"portfolio-review"}
     for s in suggestions:
@@ -162,11 +269,18 @@ def main() -> None:
     _ensure_labels_exist(all_labels)
 
     issues_created = 0
+    skipped = 0
     for suggestion in suggestions:
         title = suggestion.get("title", "Portfolio improvement suggestion")
         priority = suggestion.get("priority", "medium")
         category = suggestion.get("category", "")
         body_text = suggestion.get("body", "")
+
+        # Skip if an open issue already covers this category
+        if category and category in existing_categories:
+            log.info("issue_skipped_duplicate", title=title, category=category)
+            skipped += 1
+            continue
 
         # Build issue body with context
         issue_body = f"""## Portfolio Review — Grade: {grade}
@@ -201,8 +315,16 @@ _This issue was automatically created by the portfolio review agent._
 
         if _create_github_issue(title, issue_body, labels):
             issues_created += 1
+            # Track newly created category to avoid duplicates within same run
+            if category:
+                existing_categories.add(category)
 
-    log.info("review_agent_complete", grade=grade, issues_created=issues_created)
+    log.info(
+        "review_agent_complete",
+        grade=grade,
+        issues_created=issues_created,
+        skipped=skipped,
+    )
 
     _write_github_output(
         {

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from datetime import UTC, datetime
 
@@ -142,6 +143,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
     theses_prompt = thesis_store.format_for_prompt()
     equity_prompt = equity_tracker.format_for_prompt()
     perf_prompt = perf_tracker.format_for_prompt(equity_tracker.daily_returns(30))
+    review_prompt = _fetch_review_issues(log)
 
     signals, analysis_summary = ai.analyze(
         portfolio,
@@ -150,6 +152,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         theses_prompt=theses_prompt,
         equity_prompt=equity_prompt,
         performance_prompt=perf_prompt,
+        review_issues_prompt=review_prompt,
     )
 
     # Merge trailing stop signals with AI signals
@@ -350,6 +353,61 @@ def _record_trade(
         existing = thesis_store.get_thesis(order.symbol)
         if existing:
             thesis_store.close_thesis(order.symbol, reason=order.reason)
+
+
+def _fetch_review_issues(log: object) -> str:
+    """Fetch recent high-priority portfolio review issues from GitHub.
+
+    Returns a formatted string of recent review suggestions, or empty string on failure.
+    """
+    _log = structlog.get_logger()
+    try:
+        result = subprocess.run(  # noqa: S603
+            [  # noqa: S607
+                "gh",
+                "issue",
+                "list",
+                "--label",
+                "portfolio-review,high-priority",
+                "--state",
+                "open",
+                "--limit",
+                "5",
+                "--json",
+                "title,labels,body",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            return ""
+
+        issues = json.loads(result.stdout)
+        if not issues:
+            return ""
+
+        lines: list[str] = []
+        for issue in issues:
+            title = issue.get("title", "")
+            # Extract just the first paragraph of the body for brevity
+            body = issue.get("body", "")
+            summary = body.split("\n---")[0].split("\n\n")[1] if "\n\n" in body else ""
+            priority_labels = [
+                lbl.get("name", "") if isinstance(lbl, dict) else str(lbl)
+                for lbl in issue.get("labels", [])
+                if isinstance(lbl, dict) and lbl.get("name", "").endswith("-priority")
+            ]
+            priority = priority_labels[0] if priority_labels else "medium-priority"
+            lines.append(f"- **[{priority}]** {title}")
+            if summary:
+                lines.append(f"  {summary[:200]}")
+
+        prompt = "\n".join(lines)
+        _log.info("review_issues_loaded", count=len(issues))
+        return prompt
+    except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError):
+        return ""
 
 
 def _normalize_crypto_symbol(symbol: str) -> str:
