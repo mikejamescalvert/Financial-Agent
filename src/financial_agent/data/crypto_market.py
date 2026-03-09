@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import urllib.request
+from datetime import UTC, datetime
+from pathlib import Path
 
 import structlog
 
@@ -12,7 +14,11 @@ from financial_agent.data.models import CryptoMarketContext
 log = structlog.get_logger()
 
 _COINGECKO_GLOBAL = "https://api.coingecko.com/api/v3/global"
-_FEAR_GREED_URL = "https://api.alternative.me/fapi/v1/fear-and-greed-index/"
+# Primary and fallback Fear & Greed endpoints
+_FEAR_GREED_URLS = [
+    "https://api.alternative.me/fng/?limit=1",
+    "https://api.alternative.me/fapi/v1/fear-and-greed-index/",
+]
 
 _FEAR_GREED_LABELS: dict[str, str] = {
     "Extreme Fear": "extreme_fear",
@@ -21,6 +27,9 @@ _FEAR_GREED_LABELS: dict[str, str] = {
     "Greed": "greed",
     "Extreme Greed": "extreme_greed",
 }
+
+_CACHE_FILE = ".data/crypto_market_cache.json"
+_CACHE_MAX_AGE_HOURS = 4
 
 
 class CryptoMarketProvider:
@@ -33,11 +42,19 @@ class CryptoMarketProvider:
         """Fetch crypto market context.
 
         Returns a CryptoMarketContext with None values on any failure.
+        Falls back to cached data when APIs are unavailable.
         """
         try:
-            return self._build_context()
+            ctx = self._build_context()
+            # Cache if we got meaningful data
+            if ctx.btc_dominance is not None or ctx.fear_greed_index is not None:
+                self._save_cache(ctx)
+            return ctx
         except Exception:
             log.warning("crypto_market_fetch_error", exc_info=True)
+            cached = self._load_cache()
+            if cached:
+                return cached
             return CryptoMarketContext()
 
     def _build_context(self) -> CryptoMarketContext:
@@ -99,27 +116,73 @@ class CryptoMarketProvider:
     def _fetch_fear_greed(self) -> tuple[int | None, str]:
         """Fetch the crypto Fear & Greed Index.
 
-        Returns (index_value, label).
+        Tries multiple endpoint URLs as fallback. Returns (index_value, label).
         """
+        for url in _FEAR_GREED_URLS:
+            try:
+                data = _fetch_json(url)
+
+                data_list = data.get("data", [])
+                if not isinstance(data_list, list) or not data_list:
+                    continue
+
+                entry = data_list[0]
+                if not isinstance(entry, dict):
+                    continue
+
+                value = int(entry.get("value", 0))
+                raw_label = str(entry.get("value_classification", "Neutral"))
+                label = _FEAR_GREED_LABELS.get(raw_label, "neutral")
+
+                return value, label
+            except Exception:
+                log.debug("fear_greed_endpoint_failed", url=url, exc_info=True)
+
+        log.warning("fear_greed_fetch_error", reason="all endpoints failed")
+        return None, "neutral"
+
+    def _save_cache(self, ctx: CryptoMarketContext) -> None:
+        """Persist crypto market data to disk for offline fallback."""
         try:
-            data = _fetch_json(_FEAR_GREED_URL)
-
-            data_list = data.get("data", [])
-            if not isinstance(data_list, list) or not data_list:
-                return None, "neutral"
-
-            entry = data_list[0]
-            if not isinstance(entry, dict):
-                return None, "neutral"
-
-            value = int(entry.get("value", 0))
-            raw_label = str(entry.get("value_classification", "Neutral"))
-            label = _FEAR_GREED_LABELS.get(raw_label, "neutral")
-
-            return value, label
+            cache_path = Path(_CACHE_FILE)
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_data = {
+                "timestamp": datetime.now(tz=UTC).isoformat(),
+                "btc_dominance": ctx.btc_dominance,
+                "fear_greed_index": ctx.fear_greed_index,
+                "fear_greed_label": ctx.fear_greed_label,
+                "btc_trend": ctx.btc_trend,
+                "total_market_cap": ctx.total_market_cap,
+            }
+            cache_path.write_text(json.dumps(cache_data))
         except Exception:
-            log.warning("fear_greed_fetch_error", exc_info=True)
-            return None, "neutral"
+            log.debug("crypto_cache_save_failed", exc_info=True)
+
+    def _load_cache(self) -> CryptoMarketContext | None:
+        """Load cached crypto market data if fresh enough."""
+        try:
+            cache_path = Path(_CACHE_FILE)
+            if not cache_path.exists():
+                return None
+
+            raw = json.loads(cache_path.read_text())
+            cached_time = datetime.fromisoformat(raw["timestamp"])
+            age_hours = (datetime.now(tz=UTC) - cached_time).total_seconds() / 3600
+
+            if age_hours > _CACHE_MAX_AGE_HOURS:
+                return None
+
+            log.info("crypto_market_loaded_from_cache", age_hours=round(age_hours, 1))
+            return CryptoMarketContext(
+                btc_dominance=raw.get("btc_dominance"),
+                fear_greed_index=raw.get("fear_greed_index"),
+                fear_greed_label=raw.get("fear_greed_label", "neutral"),
+                btc_trend=raw.get("btc_trend", "neutral"),
+                total_market_cap=raw.get("total_market_cap"),
+            )
+        except Exception:
+            log.debug("crypto_cache_load_failed", exc_info=True)
+            return None
 
 
 def _fetch_json(url: str) -> dict[str, object]:

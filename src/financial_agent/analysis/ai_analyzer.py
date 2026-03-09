@@ -36,14 +36,22 @@ growth, high debt, poor margins) unless there's a clear technical catalyst.
 8. **Support/resistance**: Factor in proximity to key levels for entry and exit timing.
 
 ## Risk Rules
-- Be conservative with confidence scores. Only use >0.8 for very strong, multi-factor signals.
+- Use the full confidence range: >0.7 for solid multi-factor signals, >0.85 for exceptional setups.
 - Always provide a clear reason for each signal.
 - Consider the overall portfolio balance, sector exposure, and correlation.
-- If indicators are mixed or unclear, recommend HOLD.
-- Never recommend more than 3 BUY signals at once to avoid over-trading.
+- If indicators are genuinely mixed, recommend HOLD — but do NOT default to HOLD out of caution \
+when there is a reasonable signal. A cash-heavy portfolio is itself a risk (opportunity cost).
+- Never recommend more than 5 BUY signals at once to avoid over-trading.
 - Consider the current strategy mode when making recommendations.
-- If portfolio drawdown is elevated, bias toward defensive positioning.
+- If portfolio drawdown is elevated (>10%), bias toward defensive positioning.
 - If a position's original trade thesis is invalidated, recommend SELL regardless of P/L.
+
+## Capital Deployment Rules
+- High cash allocation (>30%) should be treated as a problem to solve, not a safe position.
+- When cash is excessive, actively look for deployment opportunities rather than defaulting to HOLD.
+- Micro positions (<3% of portfolio) that are losing should be exited promptly — they drag returns \
+without meaningful portfolio impact.
+- Crypto trades 24/7 and can be bought even when stock markets are closed — use this advantage.
 
 ## Crypto-specific rules
 - Crypto symbols may contain "/" (e.g., BTC/USD) or appear as concatenated (e.g., BTCUSD). \
@@ -102,6 +110,7 @@ class AIAnalyzer:
         theses_prompt: str = "",
         equity_prompt: str = "",
         performance_prompt: str = "",
+        review_issues_prompt: str = "",
     ) -> tuple[list[TradeSignal], str]:
         """Send portfolio + technical data + enrichment to Claude and parse signals.
 
@@ -114,6 +123,7 @@ class AIAnalyzer:
             theses_prompt,
             equity_prompt,
             performance_prompt,
+            review_issues_prompt,
         )
 
         log.info("ai_analysis_started", model=self._model, symbols=list(technicals.keys()))
@@ -146,6 +156,7 @@ class AIAnalyzer:
         theses_prompt: str,
         equity_prompt: str,
         performance_prompt: str,
+        review_issues_prompt: str = "",
     ) -> str:
         """Build the analysis prompt with all available data."""
         sections: list[str] = []
@@ -208,6 +219,14 @@ class AIAnalyzer:
         # Performance metrics (Issue #20)
         if performance_prompt:
             sections.append(f"## Performance Metrics\n{performance_prompt}")
+
+        # Portfolio review suggestions (feed review agent insights into trading decisions)
+        if review_issues_prompt:
+            sections.append(
+                f"## Recent Portfolio Review Suggestions\n"
+                f"The portfolio review agent identified these issues. Factor them into your "
+                f"analysis and consider acting on high-priority items:\n{review_issues_prompt}"
+            )
 
         # Technical indicators
         rounded_technicals = {

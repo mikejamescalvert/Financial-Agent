@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import time
 import urllib.request
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import structlog
@@ -15,6 +17,8 @@ if TYPE_CHECKING:
 log = structlog.get_logger()
 
 _FMP_BASE = "https://financialmodelingprep.com/stable"
+_CACHE_FILE = ".data/fundamentals_cache.json"
+_CACHE_MAX_AGE_HOURS = 12
 
 
 class FundamentalsProvider:
@@ -27,7 +31,8 @@ class FundamentalsProvider:
         """Fetch fundamental data for a list of symbols.
 
         Returns a dict mapping symbol -> FundamentalData. Symbols that fail
-        to fetch are silently skipped (logged as warnings).
+        to fetch are silently skipped (logged as warnings). Falls back to
+        cached data when fresh fetches fail.
         """
         if not self._api_key:
             log.info("fundamentals_skip", reason="no FMP API key configured")
@@ -46,8 +51,76 @@ class FundamentalsProvider:
             except Exception:
                 log.warning("fundamentals_fetch_error", symbol=symbol, exc_info=True)
 
-        log.info("fundamentals_fetched", count=len(results), total=len(symbols))
+        # If we got results, cache them for offline use
+        if results:
+            self._save_cache(results)
+            log.info("fundamentals_fetched", count=len(results), total=len(symbols))
+            return results
+
+        # No fresh data — try the cache
+        cached = self._load_cache(symbols)
+        if cached:
+            log.info(
+                "fundamentals_fetched_from_cache",
+                count=len(cached),
+                total=len(symbols),
+            )
+            return cached
+
+        log.info("fundamentals_fetched", count=0, total=len(symbols))
         return results
+
+    def _save_cache(self, results: dict[str, FundamentalData]) -> None:
+        """Persist fundamentals to disk for offline fallback."""
+        try:
+            cache_path = Path(_CACHE_FILE)
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_data = {
+                "timestamp": datetime.now(tz=UTC).isoformat(),
+                "data": {
+                    sym: {
+                        "eps_ttm": fd.eps_ttm,
+                        "pe_ratio": fd.pe_ratio,
+                        "revenue_growth": fd.revenue_growth,
+                        "profit_margin": fd.profit_margin,
+                        "debt_to_equity": fd.debt_to_equity,
+                        "free_cash_flow": fd.free_cash_flow,
+                        "price_to_book": fd.price_to_book,
+                        "market_cap": fd.market_cap,
+                    }
+                    for sym, fd in results.items()
+                },
+            }
+            cache_path.write_text(json.dumps(cache_data))
+        except Exception:
+            log.debug("fundamentals_cache_save_failed", exc_info=True)
+
+    def _load_cache(self, symbols: list[str]) -> dict[str, FundamentalData]:
+        """Load cached fundamentals if fresh enough."""
+        from financial_agent.data.models import FundamentalData
+
+        try:
+            cache_path = Path(_CACHE_FILE)
+            if not cache_path.exists():
+                return {}
+
+            raw = json.loads(cache_path.read_text())
+            cached_time = datetime.fromisoformat(raw["timestamp"])
+            age_hours = (datetime.now(tz=UTC) - cached_time).total_seconds() / 3600
+
+            if age_hours > _CACHE_MAX_AGE_HOURS:
+                log.debug("fundamentals_cache_expired", age_hours=round(age_hours, 1))
+                return {}
+
+            results: dict[str, FundamentalData] = {}
+            symbol_set = {s.upper() for s in symbols}
+            for sym, vals in raw.get("data", {}).items():
+                if sym.upper() in symbol_set:
+                    results[sym] = FundamentalData(**vals)
+            return results
+        except Exception:
+            log.debug("fundamentals_cache_load_failed", exc_info=True)
+            return {}
 
     def _fetch_json(self, endpoint: str, params: str = "") -> list[dict[str, object]]:
         """Fetch JSON from an FMP stable endpoint. Handles both dict and list responses."""

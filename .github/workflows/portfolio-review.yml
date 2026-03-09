@@ -2,8 +2,8 @@ name: Portfolio Review
 
 on:
   schedule:
-    # Run daily at 9 PM UTC (after US market close at 4 PM ET)
-    - cron: '0 21 * * *'
+    # Run weekdays at 9 PM UTC (after US market close at 4 PM ET)
+    - cron: '0 21 * * 1-5'
 
   workflow_dispatch:  # Allow manual trigger
 
