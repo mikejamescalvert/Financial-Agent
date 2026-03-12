@@ -16,6 +16,7 @@ from financial_agent.portfolio.models import (
 if TYPE_CHECKING:
     from financial_agent.config import DataConfig, TradingConfig
     from financial_agent.data.models import MarketEnrichment
+    from financial_agent.persistence.thesis_store import ThesisStore
     from financial_agent.portfolio.models import PortfolioSnapshot
     from financial_agent.risk.drawdown import DrawdownCircuitBreaker
     from financial_agent.risk.volatility import VolatilitySizer
@@ -32,11 +33,13 @@ class StrategyEngine:
         data_config: DataConfig | None = None,
         drawdown_breaker: DrawdownCircuitBreaker | None = None,
         volatility_sizer: VolatilitySizer | None = None,
+        thesis_store: ThesisStore | None = None,
     ) -> None:
         self._config = config
         self._data_config = data_config
         self._drawdown = drawdown_breaker
         self._vol_sizer = volatility_sizer
+        self._thesis_store = thesis_store
 
     def generate_orders(
         self,
@@ -97,6 +100,22 @@ class StrategyEngine:
                 if not allowed:
                     log.info("buy_blocked_sector", symbol=signal.symbol, reason=reason)
                     continue
+
+            # Anti-churn cooldown: block re-buying recently sold symbols
+            if (
+                signal.signal == SignalType.BUY
+                and self._thesis_store
+                and self._data_config
+                and self._thesis_store.is_on_cooldown(
+                    signal.symbol, self._data_config.sell_cooldown_hours
+                )
+            ):
+                log.info(
+                    "buy_blocked_cooldown",
+                    symbol=signal.symbol,
+                    cooldown_hours=self._data_config.sell_cooldown_hours,
+                )
+                continue
 
             order = self._signal_to_order(signal, portfolio, technicals, size_multiplier)
             if order is not None:
@@ -204,7 +223,7 @@ class StrategyEngine:
             if signal.scale_action == "add":
                 scale_factor = 0.33  # Add 1/3 position
             elif current_weight == 0:
-                scale_factor = 0.5  # Initial entry: half position
+                scale_factor = 0.67  # Initial entry: 2/3 position (avoids micro positions)
 
         # Target allocation scaled by confidence, size_multiplier, and scale_factor
         target_value = min(
@@ -213,7 +232,15 @@ class StrategyEngine:
             remaining_allocation * portfolio.equity,
         )
 
-        if target_value < 1.0:
+        # Enforce minimum order value to prevent micro positions
+        min_order = self._data_config.min_order_value if self._data_config else 25.0
+        if target_value < min_order:
+            log.info(
+                "skip_buy_below_minimum",
+                symbol=signal.symbol,
+                target_value=round(target_value, 2),
+                min_order_value=min_order,
+            )
             return None
 
         # Get current price: existing position > technicals > skip

@@ -177,7 +177,10 @@ Portfolio Snapshot
 - **Sector mapping is static**: No API calls needed for sector classification.
 - **Risk checks are pre-AI and post-AI**: Drawdown/earnings/sector checks happen in the strategy engine, but the AI also sees all risk data in its prompt.
 - **Trailing stops use ATR**: Dynamic stops that adapt to each symbol's volatility.
-- **Position scaling**: Entries and exits in 1/3 increments via `scale_action` field.
+- **Position scaling**: Initial entries at 2/3, add/exit in 1/3 increments via `scale_action` field.
+- **Anti-churn cooldown**: After selling a symbol, re-buying is blocked for `DATA_SELL_COOLDOWN_HOURS` (default 48h).
+- **Minimum order value**: Orders below `DATA_MIN_ORDER_VALUE` (default $25) are skipped to prevent micro positions.
+- **Dynamic cash threshold**: AI prompt adjusts acceptable cash levels based on VIX and SPY trend (higher cash OK in bear markets).
 
 ## Coding Conventions
 

@@ -212,13 +212,13 @@ def main() -> None:
 
     # Compute technicals for all held + watchlist symbols
     technicals: dict[str, dict[str, float]] = {}
+    hist_days = config.trading.historical_days
 
     crypto_watchlist = [s.strip() for s in config.trading.crypto_watchlist.split(",")]
-    held_crypto = [p.symbol for p in portfolio.crypto_positions()]
+    held_crypto = [_normalize_crypto_symbol(p.symbol) for p in portfolio.crypto_positions()]
     all_crypto = list(set(crypto_watchlist + held_crypto))
 
     if all_crypto:
-        hist_days = config.trading.historical_days
         crypto_bars = broker.get_crypto_historical_bars(all_crypto, days=hist_days)
         crypto_technicals = technical.compute_indicators(crypto_bars)
         technicals.update(crypto_technicals)
@@ -333,6 +333,15 @@ _This issue was automatically created by the portfolio review agent._
             "issues_created": issues_created,
         }
     )
+
+
+def _normalize_crypto_symbol(symbol: str) -> str:
+    """Normalize crypto symbols to the 'XXX/YYY' format required by the data API."""
+    if "/" in symbol:
+        return symbol
+    if symbol.endswith("USD"):
+        return symbol[:-3] + "/USD"
+    return symbol
 
 
 def _write_github_output(data: dict[str, object]) -> None:

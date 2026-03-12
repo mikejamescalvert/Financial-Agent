@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.error
 import urllib.request
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -41,8 +42,8 @@ class EarningsProvider:
             if result is not None:
                 self._save_cache(result, symbols)
             return result if result is not None else self._load_cache(symbols)
-        except Exception:
-            log.warning("earnings_fetch_error", exc_info=True)
+        except Exception as e:
+            log.warning("earnings_fetch_error", error=str(e))
             return self._load_cache(symbols)
 
     def _save_cache(self, events: list[EarningsEvent], symbols: list[str]) -> None:

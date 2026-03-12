@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,8 +49,8 @@ class FundamentalsProvider:
                 data = self._fetch_fundamentals(symbol)
                 if data is not None:
                     results[symbol] = data
-            except Exception:
-                log.warning("fundamentals_fetch_error", symbol=symbol, exc_info=True)
+            except Exception as e:
+                log.warning("fundamentals_fetch_error", symbol=symbol, error=str(e))
 
         # If we got results, cache them for offline use
         if results:
@@ -128,13 +129,27 @@ class FundamentalsProvider:
         req = urllib.request.Request(url)  # noqa: S310
         req.add_header("User-Agent", "FinancialAgent/1.0")
 
-        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
-            body = json.loads(resp.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+                body = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode() if e.fp else ""
+            log.warning(
+                "fmp_http_error",
+                endpoint=endpoint,
+                status=e.code,
+                error=error_body[:200],
+            )
+            raise
 
         if not body:
             return []
-        # /stable/profile returns a single dict; other endpoints return a list
+        # FMP error responses: {"Error Message": "..."} or {"message": "..."}
         if isinstance(body, dict):
+            if "Error Message" in body or "error" in body:
+                msg = body.get("Error Message") or body.get("error") or body.get("message", "")
+                log.warning("fmp_api_error", endpoint=endpoint, error=str(msg))
+                return []
             return [body]
         if not isinstance(body, list):
             return []

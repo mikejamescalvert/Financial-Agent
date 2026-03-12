@@ -39,8 +39,11 @@ class ThesisStore:
         dir_path = Path(data_dir)
         dir_path.mkdir(parents=True, exist_ok=True)
         self._path: Path = dir_path / "trade_theses.json"
+        self._cooldown_path: Path = dir_path / "sell_cooldowns.json"
         self._theses: dict[str, TradeThesis] = {}
+        self._cooldowns: dict[str, str] = {}  # symbol -> ISO timestamp of last sell
         self._load()
+        self._load_cooldowns()
 
     def _load(self) -> None:
         """Load theses from disk. Starts empty on any error."""
@@ -136,6 +139,38 @@ class ThesisStore:
         timestamp = datetime.now(tz=UTC).isoformat()
         thesis.notes.append(f"[{timestamp}] {note}")
         self._save()
+
+    def record_sell(self, symbol: str) -> None:
+        """Record that a symbol was sold, starting its cooldown timer."""
+        self._cooldowns[symbol] = datetime.now(tz=UTC).isoformat()
+        self._save_cooldowns()
+
+    def is_on_cooldown(self, symbol: str, cooldown_hours: int) -> bool:
+        """Check if a symbol is still within its post-sell cooldown period."""
+        sell_time_str = self._cooldowns.get(symbol)
+        if not sell_time_str:
+            return False
+        try:
+            sell_time = datetime.fromisoformat(sell_time_str)
+            elapsed_hours = (datetime.now(tz=UTC) - sell_time).total_seconds() / 3600
+            return elapsed_hours < cooldown_hours
+        except (ValueError, TypeError):
+            return False
+
+    def _load_cooldowns(self) -> None:
+        """Load sell cooldown timestamps from disk."""
+        try:
+            if self._cooldown_path.exists():
+                self._cooldowns = json.loads(self._cooldown_path.read_text(encoding="utf-8"))
+        except Exception:
+            self._cooldowns = {}
+
+    def _save_cooldowns(self) -> None:
+        """Write sell cooldown timestamps to disk."""
+        try:
+            self._cooldown_path.write_text(json.dumps(self._cooldowns, indent=2), encoding="utf-8")
+        except Exception:
+            log.debug("cooldowns_save_failed", exc_info=True)
 
     def format_for_prompt(self) -> str:
         """Format active theses as a readable string for the AI prompt."""
