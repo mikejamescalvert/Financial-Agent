@@ -455,8 +455,8 @@ class TestPositionScaling:
         # qty = 2640 / 160 = 16.5
         assert orders[0].qty == 16.5
 
-    def test_initial_entry_uses_half_position(self):
-        """New position with scaling enabled should use 1/2 of max."""
+    def test_initial_entry_uses_two_thirds_position(self):
+        """New position with scaling enabled should use 2/3 of max."""
         data_config = _make_data_config(enable_position_scaling=True)
         engine = StrategyEngine(
             config=_make_config(),
@@ -468,10 +468,10 @@ class TestPositionScaling:
 
         orders = engine.generate_orders(signals, portfolio, technicals)
         assert len(orders) == 1
-        # With scaling, initial entry: scale_factor = 0.5
-        # target = min(10000 * 0.8 * 1.0 * 0.5, 10000, 10000) = 4000
-        # qty = 4000 / 100 = 40
-        assert orders[0].qty == 40.0
+        # With scaling, initial entry: scale_factor = 0.67
+        # target = min(10000 * 0.8 * 1.0 * 0.67, 10000, 10000) = 5360
+        # qty = 5360 / 100 = 53.6
+        assert orders[0].qty == 53.6
 
     def test_partial_exit_sells_third(self):
         """scale_action='partial_exit' should sell 1/3 of position."""

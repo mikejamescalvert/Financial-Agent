@@ -101,6 +101,8 @@ jobs:
           DATA_USE_LIMIT_ORDERS: ${{ vars.DATA_USE_LIMIT_ORDERS || 'true' }}
           DATA_ENABLE_POSITION_SCALING: ${{ vars.DATA_ENABLE_POSITION_SCALING || 'true' }}
           DATA_RISK_BUDGET_PCT: ${{ vars.DATA_RISK_BUDGET_PCT || '0.02' }}
+          DATA_MIN_ORDER_VALUE: ${{ vars.DATA_MIN_ORDER_VALUE || '25.0' }}
+          DATA_SELL_COOLDOWN_HOURS: ${{ vars.DATA_SELL_COOLDOWN_HOURS || '48' }}
         run: python -m financial_agent.main
 
       - name: Save persistent data

@@ -63,6 +63,7 @@ def main() -> None:  # noqa: PLR0912, PLR0915
         data_config=config.data,
         drawdown_breaker=drawdown_breaker,
         volatility_sizer=vol_sizer,
+        thesis_store=thesis_store,
     )
 
     # Step 1: Check market status
@@ -350,6 +351,7 @@ def _record_trade(
         )
         thesis_store.save_thesis(thesis)
     elif order.side == "sell":
+        thesis_store.record_sell(order.symbol)
         existing = thesis_store.get_thesis(order.symbol)
         if existing:
             thesis_store.close_thesis(order.symbol, reason=order.reason)

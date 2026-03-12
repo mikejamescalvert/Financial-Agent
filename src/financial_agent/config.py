@@ -88,6 +88,14 @@ class DataConfig(BaseSettings):
         default=0.02,
         description="Target risk per position as fraction of equity.",
     )
+    min_order_value: float = Field(
+        default=25.0,
+        description="Minimum order value in dollars. Orders below this are skipped.",
+    )
+    sell_cooldown_hours: int = Field(
+        default=48,
+        description="Hours after selling a symbol before it can be re-bought.",
+    )
 
 
 class TradingConfig(BaseSettings):
