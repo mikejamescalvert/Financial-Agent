@@ -60,9 +60,39 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python -m financial_agent.screener_main
 
+      - name: Save persistent data
+        if: always()
+        uses: actions/cache/save@v5
+        with:
+          path: .data
+          key: agent-data-${{ github.run_id }}
+
       - name: Post summary
         if: always()
         run: |
           echo "## Daily Screener" >> $GITHUB_STEP_SUMMARY
           echo "- **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list --label "agent-failure" --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "Daily Screener failed at $(date -u '+%Y-%m-%d %H:%M UTC'). Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          else
+            gh label create agent-failure --color D93F0B --force 2>/dev/null || true
+            gh issue create \
+              --title "Daily Screener workflow failure" \
+              --label "agent-failure" \
+              --body "## Daily Screener Failed
+
+          **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')
+          **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
+
+          _This issue was automatically created by the CI failure alert._"
+          fi

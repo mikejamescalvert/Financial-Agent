@@ -34,7 +34,7 @@ class AIConfig(BaseSettings):
 
     api_key: str = Field(description="Anthropic API key (GitHub Secret: ANTHROPIC_API_KEY)")
     model: str = Field(
-        default="claude-sonnet-4-20250514",
+        default="claude-sonnet-4-6-20250620",
         description="Claude model to use (GitHub Variable: ANTHROPIC_MODEL)",
     )
     max_tokens: int = Field(

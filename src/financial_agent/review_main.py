@@ -36,11 +36,10 @@ def _run_gh_command(cmd: list[str], timeout: int = 30) -> tuple[bool, str]:
         return False, ""
 
 
-def _get_open_review_categories() -> set[str]:
-    """Get the set of categories that already have open portfolio-review issues.
+def _get_open_review_issues() -> tuple[set[str], list[str]]:
+    """Get categories and titles of open portfolio-review issues for deduplication.
 
-    Returns category labels (e.g. 'risk', 'strategy', 'config') that have at least
-    one open issue, so we can skip creating duplicates.
+    Returns a tuple of (category_set, title_list) from open portfolio-review issues.
     """
     log = structlog.get_logger()
     success, output = _run_gh_command(
@@ -55,28 +54,80 @@ def _get_open_review_categories() -> set[str]:
             "--limit",
             "30",
             "--json",
-            "labels",
+            "labels,title",
         ],
     )
     if not success or not output:
-        return set()
+        return set(), []
 
     try:
         issues = json.loads(output)
     except json.JSONDecodeError:
-        return set()
+        return set(), []
 
     # Extract category labels from existing open issues
     category_labels = {"risk", "performance", "strategy", "config", "watchlist"}
-    existing: set[str] = set()
+    existing_categories: set[str] = set()
+    existing_titles: list[str] = []
     for issue in issues:
+        existing_titles.append(issue.get("title", "").lower())
         for label in issue.get("labels", []):
             name = label.get("name", "") if isinstance(label, dict) else str(label)
             if name in category_labels:
-                existing.add(name)
+                existing_categories.add(name)
 
-    log.info("existing_review_categories", categories=sorted(existing), open_issues=len(issues))
-    return existing
+    log.info(
+        "existing_review_issues",
+        categories=sorted(existing_categories),
+        open_issues=len(issues),
+    )
+    return existing_categories, existing_titles
+
+
+def _is_duplicate_title(new_title: str, existing_titles: list[str]) -> bool:
+    """Check if a new issue title is too similar to an existing open issue.
+
+    Uses keyword overlap: if 50%+ of significant words in the new title appear
+    in an existing title, it's considered a duplicate.
+    """
+    stop_words = {
+        "a",
+        "an",
+        "the",
+        "to",
+        "for",
+        "of",
+        "in",
+        "on",
+        "and",
+        "or",
+        "with",
+        "from",
+        "by",
+        "at",
+        "is",
+        "it",
+        "as",
+        "be",
+        "this",
+        "that",
+        "into",
+        "current",
+        "based",
+    }
+    new_words = {w for w in new_title.lower().split() if w not in stop_words and len(w) > 2}
+    if not new_words:
+        return False
+
+    for existing in existing_titles:
+        existing_words = {w for w in existing.lower().split() if w not in stop_words and len(w) > 2}
+        if not existing_words:
+            continue
+        overlap = new_words & existing_words
+        if len(overlap) >= len(new_words) * 0.5:
+            return True
+
+    return False
 
 
 def _close_stale_review_issues() -> int:
@@ -253,8 +304,8 @@ def main() -> None:
     # Close stale issues before creating new ones
     _close_stale_review_issues()
 
-    # Check which categories already have open issues to avoid duplicates
-    existing_categories = _get_open_review_categories()
+    # Check which categories/titles already have open issues to avoid duplicates
+    existing_categories, existing_titles = _get_open_review_issues()
 
     # Ensure labels exist
     all_labels: set[str] = {"portfolio-review"}
@@ -278,7 +329,13 @@ def main() -> None:
 
         # Skip if an open issue already covers this category
         if category and category in existing_categories:
-            log.info("issue_skipped_duplicate", title=title, category=category)
+            log.info("issue_skipped_duplicate_category", title=title, category=category)
+            skipped += 1
+            continue
+
+        # Skip if a similar title already exists (prevents repeated themes across categories)
+        if _is_duplicate_title(title, existing_titles):
+            log.info("issue_skipped_duplicate_title", title=title)
             skipped += 1
             continue
 
@@ -315,9 +372,10 @@ _This issue was automatically created by the portfolio review agent._
 
         if _create_github_issue(title, issue_body, labels):
             issues_created += 1
-            # Track newly created category to avoid duplicates within same run
+            # Track newly created category/title to avoid duplicates within same run
             if category:
                 existing_categories.add(category)
+            existing_titles.append(title.lower())
 
     log.info(
         "review_agent_complete",
