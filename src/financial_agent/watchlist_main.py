@@ -64,6 +64,64 @@ def _create_github_issue(title: str, body: str, labels: list[str]) -> bool:
     return success
 
 
+def _close_stale_watchlist_issues() -> int:
+    """Close watchlist-review issues older than 7 days to prevent buildup."""
+    log = structlog.get_logger()
+    success, output = _run_gh_command(
+        [
+            "gh",
+            "issue",
+            "list",
+            "--label",
+            "watchlist-review",
+            "--state",
+            "open",
+            "--limit",
+            "100",
+            "--json",
+            "number,createdAt",
+        ],
+    )
+    if not success or not output:
+        return 0
+
+    try:
+        issues = json.loads(output)
+    except json.JSONDecodeError:
+        return 0
+
+    from datetime import UTC, datetime, timedelta
+
+    cutoff = datetime.now(tz=UTC) - timedelta(days=7)
+    closed = 0
+    for issue in issues:
+        created = issue.get("createdAt", "")
+        try:
+            created_dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            continue
+        if created_dt < cutoff:
+            num = issue["number"]
+            ok, _ = _run_gh_command(
+                [
+                    "gh",
+                    "issue",
+                    "close",
+                    str(num),
+                    "--reason",
+                    "not planned",
+                    "--comment",
+                    "Auto-closed: superseded by newer watchlist review.",
+                ],
+            )
+            if ok:
+                closed += 1
+
+    if closed:
+        log.info("stale_watchlist_issues_closed", count=closed)
+    return closed
+
+
 def _ensure_labels_exist(labels: set[str]) -> None:
     """Create labels if they don't exist yet (errors are non-fatal)."""
     label_colors = {
@@ -181,6 +239,9 @@ def main() -> None:
         new_stocks=new_stocks,
         new_crypto=new_crypto,
     )
+
+    # Close stale watchlist issues before creating new ones
+    _close_stale_watchlist_issues()
 
     # Create an audit issue summarizing changes
     _ensure_labels_exist({"watchlist-review", "watchlist", "automated"})
