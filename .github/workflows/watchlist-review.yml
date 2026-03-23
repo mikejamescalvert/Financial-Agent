@@ -58,7 +58,7 @@ jobs:
 
           # Configuration
           ALPACA_BASE_URL: ${{ vars.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets' }}
-          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-6-20250620' }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-6-20250514' }}
           TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ' }}
           TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD,SOL/USD' }}
           TRADING_STOCK_UNIVERSE: ${{ vars.TRADING_STOCK_UNIVERSE || '' }}
