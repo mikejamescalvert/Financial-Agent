@@ -65,11 +65,11 @@ class DataConfig(BaseSettings):
         description="Avoid opening positions within N days of earnings.",
     )
     max_sector_pct: float = Field(
-        default=0.30,
+        default=0.40,
         description="Max portfolio allocation to any single sector.",
     )
     trailing_stop_atr_multiplier: float = Field(
-        default=2.0,
+        default=1.5,
         description="Trailing stop distance as multiple of ATR.",
     )
     slippage_tolerance_pct: float = Field(
@@ -89,11 +89,11 @@ class DataConfig(BaseSettings):
         description="Target risk per position as fraction of equity.",
     )
     min_order_value: float = Field(
-        default=25.0,
+        default=15.0,
         description="Minimum order value in dollars. Orders below this are skipped.",
     )
     sell_cooldown_hours: int = Field(
-        default=48,
+        default=6,
         description="Hours after selling a symbol before it can be re-bought.",
     )
 
@@ -104,7 +104,7 @@ class TradingConfig(BaseSettings):
     model_config = {"env_prefix": "TRADING_"}
 
     max_position_pct: float = Field(
-        default=0.10,
+        default=0.20,
         description="Max portfolio % for a single position.",
     )
     max_daily_trades: int = Field(
@@ -112,15 +112,15 @@ class TradingConfig(BaseSettings):
         description="Max trades per day (GitHub Variable: TRADING_MAX_DAILY_TRADES)",
     )
     stop_loss_pct: float = Field(
-        default=0.05,
+        default=0.07,
         description="Default stop loss percentage (GitHub Variable: TRADING_STOP_LOSS_PCT)",
     )
     take_profit_pct: float = Field(
-        default=0.15,
+        default=0.25,
         description="Default take profit percentage (GitHub Variable: TRADING_TAKE_PROFIT_PCT)",
     )
     min_cash_reserve_pct: float = Field(
-        default=0.10,
+        default=0.05,
         description="Minimum cash reserve as % of portfolio.",
     )
     watchlist: str = Field(
@@ -171,7 +171,7 @@ class TradingConfig(BaseSettings):
         description="Broad crypto screening universe (GitHub Variable: TRADING_CRYPTO_UNIVERSE)",
     )
     strategy: str = Field(
-        default="balanced",
+        default="momentum",
         description="Active strategy: balanced, conservative, momentum.",
     )
     dry_run: bool = Field(

@@ -219,11 +219,12 @@ class StrategyEngine:
 
         # Position scaling (Issue #19): scale_action modifies entry size
         scale_factor = 1.0
-        if self._data_config and self._data_config.enable_position_scaling:
-            if signal.scale_action == "add":
-                scale_factor = 0.33  # Add 1/3 position
-            elif current_weight == 0:
-                scale_factor = 0.67  # Initial entry: 2/3 position (avoids micro positions)
+        if (
+            self._data_config
+            and self._data_config.enable_position_scaling
+            and signal.scale_action == "add"
+        ):
+            scale_factor = 0.50  # Add 1/2 position
 
         # Target allocation scaled by confidence, size_multiplier, and scale_factor
         target_value = min(

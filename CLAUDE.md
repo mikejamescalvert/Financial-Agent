@@ -165,7 +165,7 @@ Portfolio Snapshot
             │
             └── Strategy Engine
                 ├── Volatility-adjusted sizing (ATR-based)
-                ├── Position scaling (1/3 increments)
+                ├── Position scaling (1/2 add-on increments, full initial entry)
                 ├── Limit order generation
                 └── TradeOrder[] → Broker execution
 ```
@@ -176,11 +176,12 @@ Portfolio Snapshot
 - **Persistence via GitHub Actions cache**: `.data/` directory cached between workflow runs.
 - **Sector mapping is static**: No API calls needed for sector classification.
 - **Risk checks are pre-AI and post-AI**: Drawdown/earnings/sector checks happen in the strategy engine, but the AI also sees all risk data in its prompt.
-- **Trailing stops use ATR**: Dynamic stops that adapt to each symbol's volatility.
-- **Position scaling**: Initial entries at 2/3, add/exit in 1/3 increments via `scale_action` field.
-- **Anti-churn cooldown**: After selling a symbol, re-buying is blocked for `DATA_SELL_COOLDOWN_HOURS` (default 48h).
-- **Minimum order value**: Orders below `DATA_MIN_ORDER_VALUE` (default $25) are skipped to prevent micro positions.
-- **Dynamic cash threshold**: AI prompt adjusts acceptable cash levels based on VIX and SPY trend (higher cash OK in bear markets).
+- **Trailing stops use ATR**: Dynamic stops at 1.5x ATR that adapt to each symbol's volatility.
+- **Position scaling**: Full position on initial entry, add-ons at 1/2 increments, partial exits at 1/3 via `scale_action` field.
+- **Anti-churn cooldown**: After selling a symbol, re-buying is blocked for `DATA_SELL_COOLDOWN_HOURS` (default 6h).
+- **Minimum order value**: Orders below `DATA_MIN_ORDER_VALUE` (default $15) are skipped to prevent micro positions.
+- **Aggressive capital deployment**: AI prompt optimized for momentum trading with concentrated positions (max 20% per position, 5% min cash reserve).
+- **Drawdown thresholds**: Generous tiers (15%/25%/35%/50%) to avoid premature trading freezes on small accounts.
 
 ## Coding Conventions
 
