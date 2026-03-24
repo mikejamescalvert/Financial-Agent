@@ -4,8 +4,8 @@ on:
   schedule:
     # Every 30 minutes on weekdays (stocks + crypto)
     - cron: '*/30 * * * 1-5'
-    # Every 4 hours on weekends (crypto only — saves API credits)
-    - cron: '0 */4 * * 0,6'
+    # Every 2 hours on weekends (crypto only — catch momentum moves)
+    - cron: '0 */2 * * 0,6'
 
   workflow_dispatch:
     inputs:
@@ -80,14 +80,14 @@ jobs:
           # Configuration (from GitHub Variables)
           ALPACA_BASE_URL: ${{ vars.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets' }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-6' }}
-          TRADING_MAX_POSITION_PCT: ${{ vars.TRADING_MAX_POSITION_PCT || '0.10' }}
+          TRADING_MAX_POSITION_PCT: ${{ vars.TRADING_MAX_POSITION_PCT || '0.20' }}
           TRADING_MAX_DAILY_TRADES: ${{ vars.TRADING_MAX_DAILY_TRADES || '10' }}
-          TRADING_STOP_LOSS_PCT: ${{ vars.TRADING_STOP_LOSS_PCT || '0.05' }}
-          TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.15' }}
-          TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.10' }}
-          TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ' }}
-          TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD,SOL/USD' }}
-          TRADING_STRATEGY: ${{ inputs.strategy || vars.TRADING_STRATEGY || 'balanced' }}
+          TRADING_STOP_LOSS_PCT: ${{ vars.TRADING_STOP_LOSS_PCT || '0.07' }}
+          TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.25' }}
+          TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.05' }}
+          TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'NVDA,META,AMZN,MSFT,AAPL' }}
+          TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD' }}
+          TRADING_STRATEGY: ${{ inputs.strategy || vars.TRADING_STRATEGY || 'momentum' }}
           TRADING_DRY_RUN: ${{ inputs.dry_run || vars.TRADING_DRY_RUN || 'false' }}
           TRADING_HISTORICAL_DAYS: ${{ vars.TRADING_HISTORICAL_DAYS || '270' }}
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
@@ -95,15 +95,15 @@ jobs:
           # Data provider keys (optional — features degrade gracefully without them)
           DATA_FMP_API_KEY: ${{ secrets.DATA_FMP_API_KEY || '' }}
           DATA_FINNHUB_API_KEY: ${{ secrets.DATA_FINNHUB_API_KEY || '' }}
-          DATA_EARNINGS_BUFFER_DAYS: ${{ vars.DATA_EARNINGS_BUFFER_DAYS || '3' }}
-          DATA_MAX_SECTOR_PCT: ${{ vars.DATA_MAX_SECTOR_PCT || '0.30' }}
-          DATA_TRAILING_STOP_ATR_MULTIPLIER: ${{ vars.DATA_TRAILING_STOP_ATR_MULTIPLIER || '2.0' }}
+          DATA_EARNINGS_BUFFER_DAYS: ${{ vars.DATA_EARNINGS_BUFFER_DAYS || '1' }}
+          DATA_MAX_SECTOR_PCT: ${{ vars.DATA_MAX_SECTOR_PCT || '0.40' }}
+          DATA_TRAILING_STOP_ATR_MULTIPLIER: ${{ vars.DATA_TRAILING_STOP_ATR_MULTIPLIER || '1.5' }}
           DATA_SLIPPAGE_TOLERANCE_PCT: ${{ vars.DATA_SLIPPAGE_TOLERANCE_PCT || '0.002' }}
-          DATA_USE_LIMIT_ORDERS: ${{ vars.DATA_USE_LIMIT_ORDERS || 'true' }}
+          DATA_USE_LIMIT_ORDERS: ${{ vars.DATA_USE_LIMIT_ORDERS || 'false' }}
           DATA_ENABLE_POSITION_SCALING: ${{ vars.DATA_ENABLE_POSITION_SCALING || 'true' }}
           DATA_RISK_BUDGET_PCT: ${{ vars.DATA_RISK_BUDGET_PCT || '0.02' }}
-          DATA_MIN_ORDER_VALUE: ${{ vars.DATA_MIN_ORDER_VALUE || '25.0' }}
-          DATA_SELL_COOLDOWN_HOURS: ${{ vars.DATA_SELL_COOLDOWN_HOURS || '48' }}
+          DATA_MIN_ORDER_VALUE: ${{ vars.DATA_MIN_ORDER_VALUE || '15.0' }}
+          DATA_SELL_COOLDOWN_HOURS: ${{ vars.DATA_SELL_COOLDOWN_HOURS || '6' }}
         run: python -m financial_agent.main
 
       - name: Save persistent data
@@ -119,7 +119,7 @@ jobs:
           echo "## Trading Agent Run — FAILED" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')" >> $GITHUB_STEP_SUMMARY
-          echo "- **Strategy:** ${{ inputs.strategy || vars.TRADING_STRATEGY || 'balanced' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Strategy:** ${{ inputs.strategy || vars.TRADING_STRATEGY || 'momentum' }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Dry Run:** ${{ inputs.dry_run || vars.TRADING_DRY_RUN || 'false' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "The agent crashed before completing. Check the logs above for details." >> $GITHUB_STEP_SUMMARY
@@ -141,7 +141,7 @@ jobs:
 
           **Time:** $(date -u '+%Y-%m-%d %H:%M UTC')
           **Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          **Strategy:** ${{ inputs.strategy || vars.TRADING_STRATEGY || 'balanced' }}
+          **Strategy:** ${{ inputs.strategy || vars.TRADING_STRATEGY || 'momentum' }}
 
           Check the [workflow logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details.
 
