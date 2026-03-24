@@ -11,10 +11,10 @@ import structlog
 log = structlog.get_logger()
 
 _DEFAULT_VOLATILITY_CAPS: dict[str, float] = {
-    "low": 0.12,
-    "medium": 0.08,
-    "high": 0.05,
-    "very_high": 0.03,
+    "low": 0.20,
+    "medium": 0.15,
+    "high": 0.10,
+    "very_high": 0.07,
 }
 
 _VOL_TIER_NUMERIC: dict[str, float] = {

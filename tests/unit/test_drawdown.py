@@ -13,40 +13,40 @@ class TestDrawdownCircuitBreaker:
 
     def test_small_drawdown_still_normal(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        # 3% drawdown, below the 5% threshold
-        action = breaker.get_action(97_000.0)
+        # 10% drawdown, below the 15% threshold
+        action = breaker.get_action(90_000.0)
         assert action == DrawdownAction.NORMAL
 
-    def test_5pct_drawdown_triggers_reduce_size(self):
+    def test_15pct_drawdown_triggers_reduce_size(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        # 5% drawdown (exactly at threshold)
-        action = breaker.get_action(95_000.0)
-        assert action == DrawdownAction.REDUCE_SIZE
-
-    def test_7pct_drawdown_triggers_reduce_size(self):
-        breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        # 7% drawdown (between 5% and 10%)
-        action = breaker.get_action(93_000.0)
-        assert action == DrawdownAction.REDUCE_SIZE
-
-    def test_10pct_drawdown_triggers_buys_blocked(self):
-        breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        action = breaker.get_action(90_000.0)
-        assert action == DrawdownAction.BUYS_ONLY_BLOCKED
-
-    def test_15pct_drawdown_triggers_derisk(self):
-        breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
+        # 15% drawdown (exactly at threshold)
         action = breaker.get_action(85_000.0)
-        assert action == DrawdownAction.DERISK
+        assert action == DrawdownAction.REDUCE_SIZE
 
-    def test_20pct_drawdown_triggers_halt(self):
+    def test_20pct_drawdown_triggers_reduce_size(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
+        # 20% drawdown (between 15% and 25%)
         action = breaker.get_action(80_000.0)
-        assert action == DrawdownAction.HALT
+        assert action == DrawdownAction.REDUCE_SIZE
 
-    def test_25pct_drawdown_triggers_halt(self):
+    def test_25pct_drawdown_triggers_buys_blocked(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
         action = breaker.get_action(75_000.0)
+        assert action == DrawdownAction.BUYS_ONLY_BLOCKED
+
+    def test_35pct_drawdown_triggers_derisk(self):
+        breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
+        action = breaker.get_action(65_000.0)
+        assert action == DrawdownAction.DERISK
+
+    def test_50pct_drawdown_triggers_halt(self):
+        breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
+        action = breaker.get_action(50_000.0)
+        assert action == DrawdownAction.HALT
+
+    def test_60pct_drawdown_triggers_halt(self):
+        breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
+        action = breaker.get_action(40_000.0)
         assert action == DrawdownAction.HALT
 
 
@@ -56,24 +56,24 @@ class TestSizeMultiplier:
         mult = breaker.size_multiplier(100_000.0)
         assert mult == 1.0
 
-    def test_reduce_size_returns_half(self):
+    def test_reduce_size_returns_075(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        mult = breaker.size_multiplier(95_000.0)
-        assert mult == 0.5
+        mult = breaker.size_multiplier(85_000.0)
+        assert mult == 0.75
 
     def test_buys_blocked_returns_zero(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        mult = breaker.size_multiplier(90_000.0)
+        mult = breaker.size_multiplier(75_000.0)
         assert mult == 0.0
 
     def test_derisk_returns_zero(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        mult = breaker.size_multiplier(85_000.0)
+        mult = breaker.size_multiplier(65_000.0)
         assert mult == 0.0
 
     def test_halt_returns_zero(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        mult = breaker.size_multiplier(80_000.0)
+        mult = breaker.size_multiplier(50_000.0)
         assert mult == 0.0
 
 
@@ -116,30 +116,30 @@ class TestCurrentDrawdown:
 
 
 class TestIsRecovered:
-    def test_recovered_when_drawdown_below_5pct(self):
+    def test_recovered_when_drawdown_below_10pct(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        # 3% drawdown is below the 5% recovery threshold
-        assert breaker.is_recovered(97_000.0) is True
+        # 5% drawdown is below the 10% recovery threshold
+        assert breaker.is_recovered(95_000.0) is True
 
-    def test_not_recovered_when_drawdown_above_5pct(self):
+    def test_not_recovered_when_drawdown_above_10pct(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        # 10% drawdown is above the recovery threshold
-        assert breaker.is_recovered(90_000.0) is False
+        # 15% drawdown is above the recovery threshold
+        assert breaker.is_recovered(85_000.0) is False
 
     def test_recovered_at_peak(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
         assert breaker.is_recovered(100_000.0) is True
 
-    def test_not_recovered_at_exactly_5pct(self):
+    def test_not_recovered_at_exactly_10pct(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        # Exactly at 5% is not strictly less than threshold
-        assert breaker.is_recovered(95_000.0) is False
+        # Exactly at 10% is not strictly less than threshold
+        assert breaker.is_recovered(90_000.0) is False
 
 
 class TestRecoveryThreshold:
     def test_default_recovery_threshold(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
-        assert breaker.recovery_threshold() == 0.05
+        assert breaker.recovery_threshold() == 0.10
 
 
 class TestCustomTiers:

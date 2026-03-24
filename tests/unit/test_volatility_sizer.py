@@ -34,34 +34,34 @@ class TestClassifyVolatility:
 class TestMaxPositionPct:
     def test_low_vol_cap(self):
         sizer = VolatilitySizer()
-        # low volatility (atr_pct < 1.0) -> 0.12
-        assert sizer.max_position_pct(0.5) == 0.12
+        # low volatility (atr_pct < 1.0) -> 0.20
+        assert sizer.max_position_pct(0.5) == 0.20
 
     def test_medium_vol_cap(self):
         sizer = VolatilitySizer()
-        # medium volatility (1.0 <= atr_pct <= 3.0) -> 0.08
-        assert sizer.max_position_pct(2.0) == 0.08
+        # medium volatility (1.0 <= atr_pct <= 3.0) -> 0.15
+        assert sizer.max_position_pct(2.0) == 0.15
 
     def test_high_vol_cap(self):
         sizer = VolatilitySizer()
-        # high volatility (3.0 < atr_pct <= 5.0) -> 0.05
-        assert sizer.max_position_pct(4.0) == 0.05
+        # high volatility (3.0 < atr_pct <= 5.0) -> 0.10
+        assert sizer.max_position_pct(4.0) == 0.10
 
     def test_very_high_vol_cap(self):
         sizer = VolatilitySizer()
-        # very high volatility (atr_pct > 5.0) -> 0.03
-        assert sizer.max_position_pct(8.0) == 0.03
+        # very high volatility (atr_pct > 5.0) -> 0.07
+        assert sizer.max_position_pct(8.0) == 0.07
 
     def test_custom_caps(self):
         custom_caps = {
-            "low": 0.20,
-            "medium": 0.15,
-            "high": 0.10,
-            "very_high": 0.05,
+            "low": 0.25,
+            "medium": 0.18,
+            "high": 0.12,
+            "very_high": 0.08,
         }
         sizer = VolatilitySizer(volatility_caps=custom_caps)
-        assert sizer.max_position_pct(0.5) == 0.20
-        assert sizer.max_position_pct(2.0) == 0.15
+        assert sizer.max_position_pct(0.5) == 0.25
+        assert sizer.max_position_pct(2.0) == 0.18
 
 
 class TestSizePosition:
@@ -70,20 +70,20 @@ class TestSizePosition:
         # equity=100000, price=100, atr=2
         # risk_amount = 100000 * 0.02 = 2000
         # qty = 2000 / 2 = 1000
-        # atr_pct = (2/100)*100 = 2.0 -> medium -> cap = 0.08
-        # max_value = 0.08 * 100000 = 8000
-        # position_value = 1000 * 100 = 100000 > 8000, so cap
-        # qty = 8000 / 100 = 80
+        # atr_pct = (2/100)*100 = 2.0 -> medium -> cap = 0.15
+        # max_value = 0.15 * 100000 = 15000
+        # position_value = 1000 * 100 = 100000 > 15000, so cap
+        # qty = 15000 / 100 = 150
         qty = sizer.size_position(equity=100_000.0, price=100.0, atr=2.0)
-        assert qty == 80.0
+        assert qty == 150.0
 
     def test_sizing_not_capped(self):
         sizer = VolatilitySizer(risk_budget_pct=0.002)
         # risk_amount = 100000 * 0.002 = 200
         # qty = 200 / 5 = 40
-        # atr_pct = (5/100)*100 = 5.0 -> high -> cap = 0.05
-        # max_value = 0.05 * 100000 = 5000
-        # position_value = 40 * 100 = 4000 < 5000, no cap
+        # atr_pct = (5/100)*100 = 5.0 -> high -> cap = 0.10
+        # max_value = 0.10 * 100000 = 10000
+        # position_value = 40 * 100 = 4000 < 10000, no cap
         qty = sizer.size_position(equity=100_000.0, price=100.0, atr=5.0)
         assert qty == 40.0
 
@@ -91,12 +91,12 @@ class TestSizePosition:
         sizer = VolatilitySizer(risk_budget_pct=0.10)
         # risk_amount = 100000 * 0.10 = 10000
         # qty = 10000 / 1 = 10000
-        # atr_pct = (1/100)*100 = 1.0 -> medium -> cap = 0.08
-        # max_value = 0.08 * 100000 = 8000
-        # position_value = 10000 * 100 = 1,000,000 > 8000
-        # qty = 8000 / 100 = 80
+        # atr_pct = (1/100)*100 = 1.0 -> medium -> cap = 0.15
+        # max_value = 0.15 * 100000 = 15000
+        # position_value = 10000 * 100 = 1,000,000 > 15000
+        # qty = 15000 / 100 = 150
         qty = sizer.size_position(equity=100_000.0, price=100.0, atr=1.0)
-        assert qty == 80.0
+        assert qty == 150.0
 
     def test_zero_atr_returns_zero(self):
         sizer = VolatilitySizer()

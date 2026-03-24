@@ -100,14 +100,14 @@ def _make_position(
 
 class TestDrawdownCircuitBreakerIntegration:
     def test_buys_blocked_when_drawdown_high(self):
-        """When drawdown >= 10%, buys should be blocked (size_multiplier=0)."""
+        """When drawdown >= 25%, buys should be blocked (size_multiplier=0)."""
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
         engine = StrategyEngine(
             config=_make_config(),
             drawdown_breaker=breaker,
         )
-        # 10% drawdown: equity=90k, peak=100k
-        portfolio = _make_portfolio(equity=90_000.0, cash=18_000.0)
+        # 25% drawdown: equity=75k, peak=100k
+        portfolio = _make_portfolio(equity=75_000.0, cash=15_000.0)
         technicals = {"AAPL": {"current_price": 160.0}}
         signals = [_make_signal(signal=SignalType.BUY)]
 
@@ -122,8 +122,8 @@ class TestDrawdownCircuitBreakerIntegration:
             drawdown_breaker=breaker,
         )
         portfolio = _make_portfolio(
-            equity=90_000.0,
-            cash=18_000.0,
+            equity=75_000.0,
+            cash=15_000.0,
             positions=[_make_position(symbol="AAPL", qty=10.0, current_price=160.0)],
         )
         signals = [_make_signal(signal=SignalType.SELL, confidence=0.5)]
@@ -132,16 +132,16 @@ class TestDrawdownCircuitBreakerIntegration:
         assert orders[0].side == "sell"
 
     def test_halt_blocks_all_trading(self):
-        """When drawdown >= 20%, all trading should halt."""
+        """When drawdown >= 50%, all trading should halt."""
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
         engine = StrategyEngine(
             config=_make_config(),
             drawdown_breaker=breaker,
         )
-        # 20% drawdown
+        # 50% drawdown
         portfolio = _make_portfolio(
-            equity=80_000.0,
-            cash=16_000.0,
+            equity=50_000.0,
+            cash=10_000.0,
             positions=[_make_position(symbol="AAPL", qty=10.0, current_price=160.0)],
         )
         signals = [
@@ -152,22 +152,22 @@ class TestDrawdownCircuitBreakerIntegration:
         assert len(orders) == 0
 
     def test_reduced_sizing_during_moderate_drawdown(self):
-        """5% drawdown should reduce buy sizes by half."""
+        """15% drawdown should reduce buy sizes to 75%."""
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
         engine = StrategyEngine(
             config=_make_config(),
             drawdown_breaker=breaker,
         )
-        portfolio = _make_portfolio(equity=95_000.0, cash=19_000.0)
+        portfolio = _make_portfolio(equity=85_000.0, cash=17_000.0)
         technicals = {"AAPL": {"current_price": 100.0}}
         signals = [_make_signal(signal=SignalType.BUY, confidence=0.8)]
 
         orders = engine.generate_orders(signals, portfolio, technicals)
         assert len(orders) == 1
-        # Max position = 95000 * 0.10 = 9500
-        # Target = 9500 * 0.8 * 0.5 (size_multiplier) = 3800
-        # qty = 3800 / 100 = 38
-        assert orders[0].qty == 38.0
+        # Max position = 85000 * 0.10 = 8500
+        # Target = 8500 * 0.8 * 0.75 (size_multiplier) = 5100
+        # qty = 5100 / 100 = 51
+        assert orders[0].qty == 51.0
 
 
 class TestEarningsBufferIntegration:
@@ -341,17 +341,17 @@ class TestVolatilityAdjustedSizing:
             volatility_sizer=vol_sizer,
         )
         portfolio = _make_portfolio(equity=100_000.0, cash=20_000.0)
-        # atr_pct = (8/100)*100 = 8.0 -> very_high -> cap = 0.03
+        # atr_pct = (8/100)*100 = 8.0 -> very_high -> cap = 0.07
         technicals = {"AAPL": {"current_price": 100.0, "atr_pct": 8.0}}
         signals = [_make_signal(signal=SignalType.BUY, confidence=0.8)]
 
         orders = engine.generate_orders(signals, portfolio, technicals)
         assert len(orders) == 1
-        # vol cap = 0.03 * 100000 = 3000
-        # max_position = min(10000, 3000) = 3000
-        # target = min(3000 * 0.8, 10000, 3000) = 2400
-        # qty = 2400 / 100 = 24
-        assert orders[0].qty == 24.0
+        # vol cap = 0.07 * 100000 = 7000
+        # max_position = min(10000, 7000) = 7000
+        # target = min(7000 * 0.8, 10000, 7000) = 5600
+        # qty = 5600 / 100 = 56
+        assert orders[0].qty == 56.0
 
     def test_normal_position_for_low_vol_stock(self):
         """Low-volatility stocks should get normal-sized positions."""
@@ -361,14 +361,14 @@ class TestVolatilityAdjustedSizing:
             volatility_sizer=vol_sizer,
         )
         portfolio = _make_portfolio(equity=100_000.0, cash=20_000.0)
-        # atr_pct = (0.3/100)*100 = 0.3 -> low -> cap = 0.12
+        # atr_pct = (0.3/100)*100 = 0.3 -> low -> cap = 0.20
         technicals = {"AAPL": {"current_price": 100.0, "atr_pct": 0.3}}
         signals = [_make_signal(signal=SignalType.BUY, confidence=0.8)]
 
         orders = engine.generate_orders(signals, portfolio, technicals)
         assert len(orders) == 1
-        # vol cap = 0.12 * 100000 = 12000
-        # max_position = min(10000, 12000) = 10000 (config cap is tighter)
+        # vol cap = 0.20 * 100000 = 20000
+        # max_position = min(10000, 20000) = 10000 (config cap is tighter)
         # target = min(10000 * 0.8, 10000, 10000) = 8000
         # qty = 8000 / 100 = 80
         assert orders[0].qty == 80.0
@@ -429,8 +429,8 @@ class TestLimitOrders:
 
 
 class TestPositionScaling:
-    def test_scale_add_uses_third_position(self):
-        """scale_action='add' should use 1/3 of max position size."""
+    def test_scale_add_uses_half_position(self):
+        """scale_action='add' should use 1/2 of max position size."""
         data_config = _make_data_config(enable_position_scaling=True)
         engine = StrategyEngine(
             config=_make_config(),
@@ -447,16 +447,16 @@ class TestPositionScaling:
 
         orders = engine.generate_orders(signals, portfolio)
         assert len(orders) == 1
-        # With scaling: scale_factor = 0.33
+        # With scaling: scale_factor = 0.50
         # max_position = 10000
         # current_weight = 800/100000 = 0.008
         # remaining = 0.10 - 0.008 = 0.092
-        # target = min(10000 * 0.8 * 1.0 * 0.33, 10000, 9200) = 2640
-        # qty = 2640 / 160 = 16.5
-        assert orders[0].qty == 16.5
+        # target = min(10000 * 0.8 * 1.0 * 0.50, 10000, 9200) = 4000
+        # qty = 4000 / 160 = 25.0
+        assert orders[0].qty == 25.0
 
-    def test_initial_entry_uses_two_thirds_position(self):
-        """New position with scaling enabled should use 2/3 of max."""
+    def test_initial_entry_uses_full_position(self):
+        """New position with scaling enabled should use full position size."""
         data_config = _make_data_config(enable_position_scaling=True)
         engine = StrategyEngine(
             config=_make_config(),
@@ -468,10 +468,10 @@ class TestPositionScaling:
 
         orders = engine.generate_orders(signals, portfolio, technicals)
         assert len(orders) == 1
-        # With scaling, initial entry: scale_factor = 0.67
-        # target = min(10000 * 0.8 * 1.0 * 0.67, 10000, 10000) = 5360
-        # qty = 5360 / 100 = 53.6
-        assert orders[0].qty == 53.6
+        # With scaling, initial entry: scale_factor = 1.0 (full position)
+        # target = min(10000 * 0.8 * 1.0 * 1.0, 10000, 10000) = 8000
+        # qty = 8000 / 100 = 80.0
+        assert orders[0].qty == 80.0
 
     def test_partial_exit_sells_third(self):
         """scale_action='partial_exit' should sell 1/3 of position."""

@@ -28,20 +28,20 @@ class DrawdownAction(StrEnum):
 # Populate after class is defined to avoid forward reference issues.
 _SIZE_MULTIPLIERS = {
     DrawdownAction.NORMAL: 1.0,
-    DrawdownAction.REDUCE_SIZE: 0.5,
+    DrawdownAction.REDUCE_SIZE: 0.75,
     DrawdownAction.BUYS_ONLY_BLOCKED: 0.0,
     DrawdownAction.DERISK: 0.0,
     DrawdownAction.HALT: 0.0,
 }
 
 _DEFAULT_TIERS: dict[float, DrawdownAction] = {
-    0.05: DrawdownAction.REDUCE_SIZE,
-    0.10: DrawdownAction.BUYS_ONLY_BLOCKED,
-    0.15: DrawdownAction.DERISK,
-    0.20: DrawdownAction.HALT,
+    0.15: DrawdownAction.REDUCE_SIZE,
+    0.25: DrawdownAction.BUYS_ONLY_BLOCKED,
+    0.35: DrawdownAction.DERISK,
+    0.50: DrawdownAction.HALT,
 }
 
-_RECOVERY_THRESHOLD = 0.05
+_RECOVERY_THRESHOLD = 0.10
 
 
 class DrawdownCircuitBreaker:
