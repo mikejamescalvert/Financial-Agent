@@ -61,7 +61,7 @@ class DataConfig(BaseSettings):
         description="Directory for persistent data (theses, equity history, trade journal).",
     )
     earnings_buffer_days: int = Field(
-        default=3,
+        default=1,
         description="Avoid opening positions within N days of earnings.",
     )
     max_sector_pct: float = Field(
@@ -77,7 +77,7 @@ class DataConfig(BaseSettings):
         description="Max slippage for limit orders (0.2%).",
     )
     use_limit_orders: bool = Field(
-        default=True,
+        default=False,
         description="Use limit orders instead of market orders.",
     )
     enable_position_scaling: bool = Field(
@@ -124,11 +124,11 @@ class TradingConfig(BaseSettings):
         description="Minimum cash reserve as % of portfolio.",
     )
     watchlist: str = Field(
-        default="AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ",
+        default="NVDA,META,AMZN,MSFT,AAPL",
         description="Comma-separated watchlist (GitHub Variable: TRADING_WATCHLIST)",
     )
     crypto_watchlist: str = Field(
-        default="BTC/USD,ETH/USD,SOL/USD",
+        default="BTC/USD,ETH/USD",
         description="Comma-separated crypto watchlist (GitHub Variable: TRADING_CRYPTO_WATCHLIST)",
     )
     stock_universe: str = Field(

@@ -58,14 +58,14 @@ jobs:
           # Configuration (reuses trading variables)
           ALPACA_BASE_URL: ${{ vars.ALPACA_BASE_URL || 'https://paper-api.alpaca.markets' }}
           ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL || 'claude-sonnet-4-6' }}
-          TRADING_MAX_POSITION_PCT: ${{ vars.TRADING_MAX_POSITION_PCT || '0.10' }}
+          TRADING_MAX_POSITION_PCT: ${{ vars.TRADING_MAX_POSITION_PCT || '0.20' }}
           TRADING_MAX_DAILY_TRADES: ${{ vars.TRADING_MAX_DAILY_TRADES || '10' }}
-          TRADING_STOP_LOSS_PCT: ${{ vars.TRADING_STOP_LOSS_PCT || '0.05' }}
-          TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.15' }}
-          TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.10' }}
-          TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'AAPL,MSFT,GOOGL,AMZN,NVDA,META,TSLA,JPM,V,JNJ' }}
-          TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD,SOL/USD' }}
-          TRADING_STRATEGY: ${{ vars.TRADING_STRATEGY || 'balanced' }}
+          TRADING_STOP_LOSS_PCT: ${{ vars.TRADING_STOP_LOSS_PCT || '0.07' }}
+          TRADING_TAKE_PROFIT_PCT: ${{ vars.TRADING_TAKE_PROFIT_PCT || '0.25' }}
+          TRADING_MIN_CASH_RESERVE_PCT: ${{ vars.TRADING_MIN_CASH_RESERVE_PCT || '0.05' }}
+          TRADING_WATCHLIST: ${{ vars.TRADING_WATCHLIST || 'NVDA,META,AMZN,MSFT,AAPL' }}
+          TRADING_CRYPTO_WATCHLIST: ${{ vars.TRADING_CRYPTO_WATCHLIST || 'BTC/USD,ETH/USD' }}
+          TRADING_STRATEGY: ${{ vars.TRADING_STRATEGY || 'momentum' }}
           TRADING_DRY_RUN: 'true'  # Review agent never trades
           LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
           GH_TOKEN: ${{ github.token }}

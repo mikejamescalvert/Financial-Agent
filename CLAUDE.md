@@ -59,7 +59,7 @@ This is an AI-powered stock & crypto trading agent that runs as a scheduled GitH
 
 | Agent | Schedule | Entry Point | Purpose |
 |-------|----------|-------------|---------|
-| Trading Agent | Every 30 min | `main.py` | Core trading cycle |
+| Trading Agent | Every 30 min (weekday), 2h (weekend) | `main.py` | Core trading cycle |
 | Portfolio Review | Daily 9 PM UTC | `review_main.py` | Performance review → GitHub issues |
 | Watchlist Review | Daily 1 AM UTC | `watchlist_main.py` | Universe screening → watchlist updates |
 | Daily Screener | Weekdays 1 PM UTC | `screener_main.py` | Pre-market unusual activity scan |
