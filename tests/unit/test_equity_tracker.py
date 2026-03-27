@@ -72,13 +72,13 @@ class TestCurrentDrawdown:
         dd = tracker.current_drawdown(90_000.0)
         assert abs(dd - 0.10) < 1e-9
 
-    def test_above_peak_returns_negative(self):
+    def test_above_peak_returns_zero(self):
         data_dir = tempfile.mkdtemp()
         tracker = EquityTracker(data_dir=data_dir)
         tracker.record(100_000.0, cash=20_000.0, positions_count=5)
-        # Formula: (peak - equity) / peak = (100k - 110k) / 100k = -0.1
+        # Above peak = no drawdown, clamped to 0
         dd = tracker.current_drawdown(110_000.0)
-        assert dd < 0
+        assert dd == 0.0
 
 
 class TestDailyReturns:

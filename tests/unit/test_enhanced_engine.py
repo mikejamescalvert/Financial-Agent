@@ -152,7 +152,7 @@ class TestDrawdownCircuitBreakerIntegration:
         assert len(orders) == 0
 
     def test_reduced_sizing_during_moderate_drawdown(self):
-        """15% drawdown should reduce buy sizes to 75%."""
+        """15% drawdown should reduce buy sizes to 50%."""
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
         engine = StrategyEngine(
             config=_make_config(),
@@ -165,9 +165,9 @@ class TestDrawdownCircuitBreakerIntegration:
         orders = engine.generate_orders(signals, portfolio, technicals)
         assert len(orders) == 1
         # Max position = 85000 * 0.10 = 8500
-        # Target = 8500 * 0.8 * 0.75 (size_multiplier) = 5100
-        # qty = 5100 / 100 = 51
-        assert orders[0].qty == 51.0
+        # Target = 8500 * 0.8 * 0.50 (size_multiplier) = 3400
+        # qty = 3400 / 100 = 34
+        assert orders[0].qty == 34.0
 
 
 class TestEarningsBufferIntegration:

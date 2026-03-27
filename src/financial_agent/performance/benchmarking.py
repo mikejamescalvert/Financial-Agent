@@ -113,9 +113,11 @@ class PerformanceTracker:
 
     @staticmethod
     def _std(values: list[float]) -> float:
-        """Compute population standard deviation without numpy."""
+        """Compute sample standard deviation without numpy."""
+        if len(values) < 2:
+            return 0.0
         m = sum(values) / len(values)
-        variance = sum((x - m) ** 2 for x in values) / len(values)
+        variance = sum((x - m) ** 2 for x in values) / (len(values) - 1)
         return math.sqrt(variance)
 
     def sharpe_ratio(

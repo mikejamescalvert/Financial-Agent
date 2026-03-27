@@ -209,6 +209,17 @@ def main() -> None:
         log.warning("empty_watchlist", message="AI returned empty watchlists. Skipping update.")
         return
 
+    # Enforce: held positions must always stay on the watchlist
+    for sym in held_stocks:
+        if sym not in new_stocks:
+            log.info("watchlist_held_position_preserved", symbol=sym)
+            new_stocks.append(sym)
+    for sym in held_crypto:
+        normalized = sym if "/" in sym else (sym[:-3] + "/USD" if sym.endswith("USD") else sym)
+        if normalized not in new_crypto:
+            log.info("watchlist_held_crypto_preserved", symbol=normalized)
+            new_crypto.append(normalized)
+
     # Get current watchlists for comparison
     old_stocks = [s.strip() for s in config.trading.watchlist.split(",")]
     old_crypto = [s.strip() for s in config.trading.crypto_watchlist.split(",")]

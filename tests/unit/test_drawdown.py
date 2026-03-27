@@ -56,10 +56,10 @@ class TestSizeMultiplier:
         mult = breaker.size_multiplier(100_000.0)
         assert mult == 1.0
 
-    def test_reduce_size_returns_075(self):
+    def test_reduce_size_returns_050(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)
         mult = breaker.size_multiplier(85_000.0)
-        assert mult == 0.75
+        assert mult == 0.50
 
     def test_buys_blocked_returns_zero(self):
         breaker = DrawdownCircuitBreaker(peak_equity=100_000.0)

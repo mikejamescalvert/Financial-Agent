@@ -74,6 +74,11 @@ class EquityTracker:
             )
             self._peak_equity = 0.0
 
+        # Recover peak from history if peak file was missing/corrupt
+        if not self._peak_equity and self._history:
+            self._peak_equity = max(r.equity for r in self._history)
+            log.info("peak_recovered_from_history", peak=self._peak_equity)
+
     def _save(self) -> None:
         """Persist history (capped) and peak to disk."""
         try:
@@ -135,7 +140,8 @@ class EquityTracker:
         """
         if self._peak_equity == 0:
             return 0.0
-        return (self._peak_equity - equity) / self._peak_equity
+        dd = (self._peak_equity - equity) / self._peak_equity
+        return max(dd, 0.0)
 
     def daily_returns(self, days: int = 30) -> list[float]:
         """Return the last *days* daily return percentages."""

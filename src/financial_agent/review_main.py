@@ -327,13 +327,7 @@ def main() -> None:
         category = suggestion.get("category", "")
         body_text = suggestion.get("body", "")
 
-        # Skip if an open issue already covers this category
-        if category and category in existing_categories:
-            log.info("issue_skipped_duplicate_category", title=title, category=category)
-            skipped += 1
-            continue
-
-        # Skip if a similar title already exists (prevents repeated themes across categories)
+        # Skip if a similar title already exists (fuzzy match on keywords)
         if _is_duplicate_title(title, existing_titles):
             log.info("issue_skipped_duplicate_title", title=title)
             skipped += 1

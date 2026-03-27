@@ -28,7 +28,7 @@ class DrawdownAction(StrEnum):
 # Populate after class is defined to avoid forward reference issues.
 _SIZE_MULTIPLIERS = {
     DrawdownAction.NORMAL: 1.0,
-    DrawdownAction.REDUCE_SIZE: 0.75,
+    DrawdownAction.REDUCE_SIZE: 0.50,
     DrawdownAction.BUYS_ONLY_BLOCKED: 0.0,
     DrawdownAction.DERISK: 0.0,
     DrawdownAction.HALT: 0.0,
@@ -119,7 +119,7 @@ class DrawdownCircuitBreaker:
         """Return a position-sizing multiplier for the current drawdown state.
 
         * NORMAL -> 1.0
-        * REDUCE_SIZE -> 0.5
+        * REDUCE_SIZE -> 0.50
         * BUYS_ONLY_BLOCKED / DERISK / HALT -> 0.0
         """
         action = self.get_action(current_equity)
