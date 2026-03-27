@@ -140,7 +140,7 @@ class AlpacaBroker:
             for o in raw_orders:
                 if str(o.status) == "filled":
                     sym = o.symbol
-                    side = str(o.side)
+                    side = o.side.value if hasattr(o.side, "value") else str(o.side)
                     if sym not in result:
                         result[sym] = set()
                     result[sym].add(side)

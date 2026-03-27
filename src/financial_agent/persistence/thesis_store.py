@@ -152,18 +152,39 @@ class ThesisStore:
             return False
         try:
             sell_time = datetime.fromisoformat(sell_time_str)
+            if sell_time.tzinfo is None:
+                sell_time = sell_time.replace(tzinfo=UTC)
             elapsed_hours = (datetime.now(tz=UTC) - sell_time).total_seconds() / 3600
             return elapsed_hours < cooldown_hours
         except (ValueError, TypeError):
             return False
 
     def _load_cooldowns(self) -> None:
-        """Load sell cooldown timestamps from disk."""
+        """Load sell cooldown timestamps from disk and prune expired entries."""
         try:
             if self._cooldown_path.exists():
                 self._cooldowns = json.loads(self._cooldown_path.read_text(encoding="utf-8"))
+                self._prune_expired_cooldowns()
         except Exception:
             self._cooldowns = {}
+
+    def _prune_expired_cooldowns(self, max_age_hours: int = 72) -> None:
+        """Remove cooldown entries older than max_age_hours."""
+        now = datetime.now(tz=UTC)
+        expired = []
+        for symbol, sell_time_str in self._cooldowns.items():
+            try:
+                sell_time = datetime.fromisoformat(sell_time_str)
+                if sell_time.tzinfo is None:
+                    sell_time = sell_time.replace(tzinfo=UTC)
+                if (now - sell_time).total_seconds() / 3600 >= max_age_hours:
+                    expired.append(symbol)
+            except (ValueError, TypeError):
+                expired.append(symbol)
+        for symbol in expired:
+            del self._cooldowns[symbol]
+        if expired:
+            self._save_cooldowns()
 
     def _save_cooldowns(self) -> None:
         """Write sell cooldown timestamps to disk."""

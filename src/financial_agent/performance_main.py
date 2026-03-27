@@ -56,7 +56,7 @@ def main() -> None:
     portfolio = broker.get_portfolio_snapshot()
 
     # Calculate metrics
-    daily_returns = equity_tracker.daily_returns(30)
+    daily_returns = equity_tracker.daily_returns(90)
     sharpe = perf_tracker.sharpe_ratio(daily_returns)
     sortino = perf_tracker.sortino_ratio(daily_returns)
     win_rate = perf_tracker.win_rate()
@@ -69,8 +69,8 @@ def main() -> None:
 
     # Build report
     metrics_rows = [
-        f"| Sharpe Ratio (30d) | {sharpe:.2f} |" if sharpe is not None else "",
-        f"| Sortino Ratio (30d) | {sortino:.2f} |" if sortino is not None else "",
+        f"| Sharpe Ratio (90d) | {sharpe:.2f} |" if sharpe is not None else "",
+        f"| Sortino Ratio (90d) | {sortino:.2f} |" if sortino is not None else "",
         f"| Win Rate | {win_rate:.1%} |" if win_rate is not None else "",
         f"| Profit Factor | {profit_factor:.2f} |" if profit_factor is not None else "",
         f"| Avg Win | ${avg_win:,.2f} |" if avg_win is not None else "",
