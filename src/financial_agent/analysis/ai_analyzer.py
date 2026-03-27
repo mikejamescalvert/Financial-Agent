@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import TYPE_CHECKING
 
 import anthropic
@@ -70,11 +71,24 @@ moderate sizes when momentum is strong.
 - "scale_action": "partial_exit" — take partial profits (sell 1/3)
 - "scale_action": "" — standard full signal
 
+## Capital Deployment Rules (MANDATORY)
+- You MUST generate at least 1 BUY signal every cycle unless VIX > 40 or drawdown > 25%.
+- If cash > 40% of equity, you MUST generate at least 2 BUY signals. No exceptions.
+- If cash > 60% of equity, you MUST generate at least 3 BUY signals. Sitting on cash is FAILURE.
+- When stock market is closed, deploy into crypto. BTC and ETH are always tradeable.
+- "Waiting for confirmation" is NOT a valid reason to skip deployment. Buy setups that are \
+80% ready rather than waiting for 100% — small accounts need velocity.
+- DO NOT let macro fear (VIX, drawdown, bearish SPY) prevent ALL deployment. Even in bad \
+markets, some names are working — find them and size appropriately.
+- If you cannot find ANY buy opportunities across all symbols, explain specifically why \
+each symbol fails your criteria. Generic "conditions are challenging" is not acceptable.
+
 ## Key Mindset
 - Every cycle with high cash and no trades is a MISSED OPPORTUNITY.
 - Small accounts grow through concentrated bets, not diversification.
 - Cut losers fast, let winners run, and redeploy capital constantly.
 - The biggest risk is not losing 5% on a trade — it's sitting in cash while the market moves.
+- Fear of loss causes more damage than actual losses on a small account.
 
 Respond ONLY with valid JSON matching this schema:
 {
@@ -135,14 +149,8 @@ class AIAnalyzer:
 
         log.info("ai_analysis_started", model=self._model, symbols=list(technicals.keys()))
 
-        response = self._client.messages.create(
-            model=self._model,
-            max_tokens=self._max_tokens,
-            system=SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        raw_text = self._call_with_retry(prompt)
 
-        raw_text = response.content[0].text  # type: ignore[union-attr]
         signals, analysis_summary = self._parse_response(raw_text)
 
         log.info(
@@ -154,6 +162,31 @@ class AIAnalyzer:
         )
 
         return signals, analysis_summary
+
+    def _call_with_retry(self, prompt: str, max_retries: int = 3) -> str:
+        """Call Claude API with retry logic for transient errors (429, 529, 503)."""
+        for attempt in range(max_retries):
+            try:
+                response = self._client.messages.create(
+                    model=self._model,
+                    max_tokens=self._max_tokens,
+                    system=SYSTEM_PROMPT,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                return response.content[0].text  # type: ignore[union-attr]
+            except anthropic.APIStatusError as e:
+                if e.status_code in (429, 503, 529) and attempt < max_retries - 1:
+                    wait = 2 ** (attempt + 1)  # 2s, 4s
+                    log.warning(
+                        "ai_api_retrying",
+                        status=e.status_code,
+                        attempt=attempt + 1,
+                        wait_seconds=wait,
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
+        raise RuntimeError("Unreachable")  # pragma: no cover
 
     def _build_prompt(
         self,

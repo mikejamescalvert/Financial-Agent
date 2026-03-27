@@ -2,9 +2,11 @@ name: Trading Agent
 
 on:
   schedule:
-    # Every 30 minutes on weekdays (stocks + crypto)
-    - cron: '*/30 * * * 1-5'
-    # Every 2 hours on weekends (crypto only — catch momentum moves)
+    # Every 30 minutes during US market hours (13:30-20:30 UTC, Mon-Fri)
+    - cron: '0,30 14,15,16,17,18,19,20 * * 1-5'
+    # Every 2 hours outside market hours on weekdays (crypto only)
+    - cron: '0 0,2,4,6,8,10,12,22 * * 1-5'
+    # Every 2 hours on weekends (crypto only)
     - cron: '0 */2 * * 0,6'
 
   workflow_dispatch:

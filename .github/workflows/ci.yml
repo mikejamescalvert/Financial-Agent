@@ -70,7 +70,7 @@ jobs:
         run: pip install -e ".[dev]" pip-audit
 
       - name: Check for known vulnerabilities
-        run: pip-audit
+        run: pip-audit --ignore-vuln CVE-2026-4539  # pygments 2.19.2 — no fix available yet
 
       - name: Check for secrets in code
         uses: trufflesecurity/trufflehog@main
