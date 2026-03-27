@@ -246,15 +246,15 @@ class StrategyEngine:
 
         # Get current price: existing position > technicals > skip
         current_pos = portfolio.get_position(signal.symbol)
-        if current_pos:
+        if current_pos and current_pos.current_price > 0:
             est_price = current_pos.current_price
-        elif signal.symbol in technicals and "current_price" in technicals[signal.symbol]:
+        elif signal.symbol in technicals and technicals[signal.symbol].get("current_price", 0) > 0:
             est_price = technicals[signal.symbol]["current_price"]
         else:
             log.warning("skip_buy_no_price", symbol=signal.symbol)
             return None
 
-        qty = round(target_value / est_price, 2) if est_price > 0 else 0
+        qty = round(target_value / est_price, 2)
 
         if qty <= 0:
             return None
@@ -317,7 +317,7 @@ class StrategyEngine:
         # Limit order support for sells
         order_type = OrderType.MARKET
         limit_price: float | None = None
-        if self._data_config and self._data_config.use_limit_orders:
+        if self._data_config and self._data_config.use_limit_orders and position.current_price > 0:
             slippage = self._data_config.slippage_tolerance_pct
             order_type = OrderType.LIMIT
             limit_price = round(position.current_price * (1 - slippage), 2)

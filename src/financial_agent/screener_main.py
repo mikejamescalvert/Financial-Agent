@@ -78,6 +78,26 @@ def main() -> None:
     # Add relative strength
     technicals = technical.compute_relative_strength(technicals, "SPY")
 
+    # Fetch VIX for adaptive thresholds
+    vix_level: float | None = None
+    try:
+        from financial_agent.data.macro import MacroProvider
+
+        macro = MacroProvider().fetch()
+        vix_level = macro.vix_level
+    except Exception:
+        log.debug("screener_vix_fetch_failed", exc_info=True)
+
+    # Adaptive thresholds based on market volatility
+    if vix_level is not None and vix_level < 15:
+        vol_thresh, move_thresh, rs_thresh = 3.0, 5.0, 85
+    elif vix_level is not None and vix_level > 25:
+        vol_thresh, move_thresh, rs_thresh = 1.5, 2.0, 70
+    else:
+        vol_thresh, move_thresh, rs_thresh = 2.0, 3.0, 80
+
+    log.info("screener_thresholds", vix=vix_level, vol=vol_thresh, move=move_thresh, rs=rs_thresh)
+
     # Screen for actionable setups
     alerts: list[dict[str, str]] = []
 
@@ -87,14 +107,14 @@ def main() -> None:
 
         reasons: list[str] = []
 
-        # Unusual volume (2x+ average)
+        # Unusual volume
         rel_vol = ind.get("relative_volume", 0)
-        if rel_vol >= 2.0:
+        if rel_vol >= vol_thresh:
             reasons.append(f"unusual volume ({rel_vol:.1f}x avg)")
 
-        # Big daily move (3%+)
+        # Big daily move
         daily_ret = abs(ind.get("daily_return_pct", 0))
-        if daily_ret >= 3.0:
+        if daily_ret >= move_thresh:
             direction = "up" if ind.get("daily_return_pct", 0) > 0 else "down"
             reasons.append(f"big move {direction} ({daily_ret:.1f}%)")
 
@@ -103,9 +123,9 @@ def main() -> None:
         if pct_from_high > -3.0:
             reasons.append(f"near 52w high ({pct_from_high:+.1f}%)")
 
-        # Strong relative strength (top 20%)
+        # Strong relative strength
         rs_rank = ind.get("rs_rank_pct", 0)
-        if rs_rank >= 80:
+        if rs_rank >= rs_thresh:
             reasons.append(f"strong RS (top {100 - rs_rank:.0f}%)")
 
         # Price above 200-day SMA with positive MACD
@@ -172,7 +192,19 @@ _This issue was automatically created by the daily screener._
     ]
     _run_gh_command(cmd)
 
-    _write_github_output({"alerts": len(top_alerts)})
+    # Auto-add top 3 screener picks to watchlist for immediate trading
+    top_picks = [a["symbol"] for a in top_alerts[:3] if a["symbol"] not in current_watchlist]
+    if top_picks:
+        expanded = ",".join(sorted(current_watchlist | set(top_picks)))
+        try:
+            cmd_var = ["gh", "variable", "set", "TRADING_WATCHLIST", "--body", expanded]
+            ok, _ = _run_gh_command(cmd_var)
+            if ok:
+                log.info("screener_watchlist_expanded", added=top_picks, new_watchlist=expanded)
+        except Exception:
+            log.warning("screener_watchlist_update_failed", exc_info=True)
+
+    _write_github_output({"alerts": len(top_alerts), "auto_added": top_picks})
     log.info("screener_complete")
 
 

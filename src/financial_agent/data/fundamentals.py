@@ -107,6 +107,8 @@ class FundamentalsProvider:
 
             raw = json.loads(cache_path.read_text())
             cached_time = datetime.fromisoformat(raw["timestamp"])
+            if cached_time.tzinfo is None:
+                cached_time = cached_time.replace(tzinfo=UTC)
             age_hours = (datetime.now(tz=UTC) - cached_time).total_seconds() / 3600
 
             if age_hours > _CACHE_MAX_AGE_HOURS:

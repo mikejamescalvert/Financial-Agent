@@ -79,6 +79,8 @@ class EarningsProvider:
 
             raw = json.loads(cache_path.read_text())
             cached_time = datetime.fromisoformat(raw["timestamp"])
+            if cached_time.tzinfo is None:
+                cached_time = cached_time.replace(tzinfo=UTC)
             age_hours = (datetime.now(tz=UTC) - cached_time).total_seconds() / 3600
 
             if age_hours > _CACHE_MAX_AGE_HOURS:
@@ -122,8 +124,13 @@ class EarningsProvider:
         req = urllib.request.Request(url)  # noqa: S310
         req.add_header("User-Agent", "FinancialAgent/1.0")
 
-        with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
-            body = json.loads(resp.read().decode())
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310
+                body = json.loads(resp.read().decode())
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode() if e.fp else ""
+            log.warning("earnings_http_error", status=e.code, error=error_body[:200])
+            raise
 
         # Handle dict response (FMP stable API may return a single object)
         if isinstance(body, dict):
@@ -151,6 +158,8 @@ class EarningsProvider:
                 continue
 
             days_until = (earnings_date - today).days
+            if days_until < 0:
+                continue
 
             events.append(
                 EarningsEvent(
