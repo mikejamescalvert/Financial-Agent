@@ -9,6 +9,8 @@ from pathlib import Path
 import structlog
 from pydantic import BaseModel, Field
 
+from financial_agent.utils.io import atomic_write
+
 log = structlog.get_logger()
 
 
@@ -51,10 +53,10 @@ class PerformanceTracker:
             self._trades = []
 
     def _save(self) -> None:
-        """Persist the trade journal to disk, keeping only the last 1000 trades."""
+        """Persist the trade journal to disk atomically, keeping only the last 1000 trades."""
         self._trades = self._trades[-1000:]
         data = [record.model_dump() for record in self._trades]
-        self._path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        atomic_write(self._path, json.dumps(data, indent=2))
         log.debug("trade_journal_saved", count=len(self._trades))
 
     def record_trade(self, record: TradeRecord) -> None:

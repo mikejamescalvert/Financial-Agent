@@ -9,6 +9,8 @@ from pathlib import Path
 import structlog
 from pydantic import BaseModel, Field
 
+from financial_agent.utils.io import atomic_write
+
 log = structlog.get_logger()
 
 
@@ -68,13 +70,10 @@ class ThesisStore:
             self._theses = {}
 
     def _save(self) -> None:
-        """Write all theses to disk."""
+        """Write all theses to disk atomically."""
         try:
             data = {symbol: thesis.model_dump() for symbol, thesis in self._theses.items()}
-            self._path.write_text(
-                json.dumps(data, indent=2),
-                encoding="utf-8",
-            )
+            atomic_write(self._path, json.dumps(data, indent=2))
         except Exception:
             log.error(
                 "theses_save_failed",
@@ -187,9 +186,9 @@ class ThesisStore:
             self._save_cooldowns()
 
     def _save_cooldowns(self) -> None:
-        """Write sell cooldown timestamps to disk."""
+        """Write sell cooldown timestamps to disk atomically."""
         try:
-            self._cooldown_path.write_text(json.dumps(self._cooldowns, indent=2), encoding="utf-8")
+            atomic_write(self._cooldown_path, json.dumps(self._cooldowns, indent=2))
         except Exception:
             log.debug("cooldowns_save_failed", exc_info=True)
 
