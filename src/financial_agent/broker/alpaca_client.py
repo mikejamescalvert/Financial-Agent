@@ -213,12 +213,8 @@ class AlpacaBroker:
             log.info("dry_run_order", order=order.model_dump())
             return {"status": "dry_run", "order": order.model_dump()}
 
-        # Detect crypto: check asset_class or symbol pattern (e.g. SOLUSD, BTC/USD)
-        is_crypto = (
-            order.asset_class == AssetClass.CRYPTO
-            or "/" in order.symbol
-            or order.symbol.endswith("USD")
-        )
+        # Detect crypto: check asset_class or "/" in symbol (e.g. BTC/USD)
+        is_crypto = order.asset_class == AssetClass.CRYPTO or "/" in order.symbol
         tif = TimeInForce.GTC if is_crypto else TimeInForce.DAY
         side = OrderSide.BUY if order.side == "buy" else OrderSide.SELL
 

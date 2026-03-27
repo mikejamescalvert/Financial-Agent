@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
+import structlog
 import ta  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     import pandas as pd
+
+log = structlog.get_logger()
 
 
 class TechnicalAnalyzer:
@@ -25,7 +29,8 @@ class TechnicalAnalyzer:
             try:
                 df = bars.loc[symbol].copy()
                 results[symbol] = self._indicators_for_symbol(df)
-            except Exception:  # noqa: S112
+            except (KeyError, ValueError, IndexError) as e:
+                log.warning("indicator_calc_failed", symbol=symbol, error=str(e))
                 continue
 
         return results
@@ -93,11 +98,11 @@ class TechnicalAnalyzer:
 
         # Weekly trend proxy from daily data (Issue #22)
         if len(close) >= 60:
-            weekly_close = close.iloc[::5]  # Sample every 5 days
-            indicators["weekly_sma_10"] = weekly_close.rolling(window=10).mean().iloc[-1]
-            indicators["weekly_trend"] = (
-                1.0 if close.iloc[-1] > indicators.get("weekly_sma_10", 0) else -1.0
-            )
+            weekly_close = close.iloc[-60:].iloc[::5]  # Sample last 60 bars, every 5th
+            weekly_mean = weekly_close.rolling(window=10).mean().iloc[-1]
+            if not math.isnan(weekly_mean):
+                indicators["weekly_sma_10"] = weekly_mean
+                indicators["weekly_trend"] = 1.0 if close.iloc[-1] > weekly_mean else -1.0
 
         # Momentum indicators
         indicators["rsi_14"] = ta.momentum.rsi(close, window=14).iloc[-1]
@@ -105,11 +110,27 @@ class TechnicalAnalyzer:
         indicators["stoch_k"] = stoch.stoch().iloc[-1]
         indicators["stoch_d"] = stoch.stoch_signal().iloc[-1]
 
+        # ADX for trend strength (critical for momentum confirmation)
+        if len(close) >= 14:
+            adx_val = ta.trend.adx(high, low, close, window=14).iloc[-1]
+            if not math.isnan(adx_val):
+                indicators["adx_14"] = adx_val
+
+        # Rate of Change for momentum velocity
+        if len(close) >= 12:
+            roc_val = ta.momentum.roc(close, window=12).iloc[-1]
+            if not math.isnan(roc_val):
+                indicators["roc_12"] = roc_val
+
         # Volatility indicators
         bb = ta.volatility.BollingerBands(close)
         indicators["bb_upper"] = bb.bollinger_hband().iloc[-1]
         indicators["bb_lower"] = bb.bollinger_lband().iloc[-1]
         indicators["bb_width"] = bb.bollinger_wband().iloc[-1]
+        # Normalized BB width for cross-symbol comparison
+        bb_mid = (indicators["bb_upper"] + indicators["bb_lower"]) / 2
+        if bb_mid > 0:
+            indicators["bb_width_pct"] = (indicators["bb_width"] / bb_mid) * 100
         indicators["atr_14"] = ta.volatility.average_true_range(high, low, close).iloc[-1]
 
         # ATR as % of price (Issue #28: volatility-aware sizing)
@@ -130,7 +151,10 @@ class TechnicalAnalyzer:
         # Current price context
         indicators["current_price"] = current_price
         indicators["price_vs_sma20"] = (close.iloc[-1] / indicators["sma_20"] - 1) * 100
-        indicators["daily_return_pct"] = ((close.iloc[-1] / close.iloc[-2]) - 1) * 100
+        if len(close) >= 2:
+            indicators["daily_return_pct"] = ((close.iloc[-1] / close.iloc[-2]) - 1) * 100
+        else:
+            indicators["daily_return_pct"] = 0.0
 
         # Multi-period returns for relative strength (Issue #29)
         if len(close) >= 20:
@@ -150,7 +174,8 @@ class TechnicalAnalyzer:
         indicators["pct_from_52w_high"] = ((current_price / high_252) - 1) * 100
         indicators["pct_from_52w_low"] = ((current_price / low_252) - 1) * 100
 
-        return indicators
+        # Filter out NaN values to prevent downstream issues
+        return {k: v for k, v in indicators.items() if not (isinstance(v, float) and math.isnan(v))}
 
     def _support_resistance(
         self,
