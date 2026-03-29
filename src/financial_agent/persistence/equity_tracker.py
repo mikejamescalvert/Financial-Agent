@@ -9,6 +9,8 @@ from pathlib import Path
 import structlog
 from pydantic import BaseModel
 
+from financial_agent.utils.io import atomic_write
+
 log = structlog.get_logger()
 
 _MAX_HISTORY = 365
@@ -85,14 +87,8 @@ class EquityTracker:
             trimmed = self._history[-_MAX_HISTORY:]
             self._history = trimmed
             data = [record.model_dump() for record in self._history]
-            self._path.write_text(
-                json.dumps(data, indent=2),
-                encoding="utf-8",
-            )
-            self._peak_path.write_text(
-                json.dumps({"peak": self._peak_equity}),
-                encoding="utf-8",
-            )
+            atomic_write(self._path, json.dumps(data, indent=2))
+            atomic_write(self._peak_path, json.dumps({"peak": self._peak_equity}))
         except Exception:
             log.error(
                 "equity_save_failed",

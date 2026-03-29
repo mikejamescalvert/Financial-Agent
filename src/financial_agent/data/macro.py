@@ -14,21 +14,15 @@ log = structlog.get_logger()
 
 _YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart"
 
-# Hardcoded economic calendar events by month for 2026.
-_UPCOMING_EVENTS_2026: dict[int, list[str]] = {
-    1: ["FOMC Meeting Jan 27-28", "CPI Release Jan 14", "Jobs Report Jan 9"],
-    2: ["CPI Release Feb 12", "Jobs Report Feb 6", "Retail Sales Feb 14"],
-    3: ["FOMC Meeting Mar 17-18", "CPI Release Mar 11", "Jobs Report Mar 6"],
-    4: ["CPI Release Apr 10", "Jobs Report Apr 3", "Retail Sales Apr 15"],
-    5: ["FOMC Meeting May 5-6", "CPI Release May 13", "Jobs Report May 8"],
-    6: ["FOMC Meeting Jun 16-17", "CPI Release Jun 10", "Jobs Report Jun 5"],
-    7: ["CPI Release Jul 14", "Jobs Report Jul 2", "Retail Sales Jul 16"],
-    8: ["FOMC Meeting Aug 4-5", "CPI Release Aug 12", "Jobs Report Aug 7"],
-    9: ["FOMC Meeting Sep 15-16", "CPI Release Sep 10", "Jobs Report Sep 4"],
-    10: ["CPI Release Oct 13", "Jobs Report Oct 2", "Retail Sales Oct 16"],
-    11: ["FOMC Meeting Nov 3-4", "CPI Release Nov 12", "Jobs Report Nov 6"],
-    12: ["FOMC Meeting Dec 15-16", "CPI Release Dec 10", "Jobs Report Dec 4"],
-}
+# FOMC meetings are held ~8 times/year on a fixed schedule.
+# CPI is released around the 10th-14th of each month.
+# Jobs Report (NFP) is the first Friday of each month.
+# These approximate patterns hold year over year.
+_RECURRING_EVENTS: list[str] = [
+    "FOMC Meeting (check federalreserve.gov for exact dates)",
+    "CPI Release (~10th-14th of month)",
+    "Jobs Report (1st Friday of month)",
+]
 
 
 class MacroProvider:
@@ -52,6 +46,7 @@ class MacroProvider:
         """Build the full macro context from multiple data sources."""
         vix_level, vix_trend = self._fetch_vix()
         spy_trend = self._fetch_spy_trend()
+        ten_year_yield = self._fetch_ten_year_yield()
         regime = _determine_regime(vix_level)
         events = _get_upcoming_events()
 
@@ -59,7 +54,7 @@ class MacroProvider:
             vix_level=vix_level,
             vix_trend=vix_trend,
             spy_trend=spy_trend,
-            ten_year_yield=None,
+            ten_year_yield=ten_year_yield,
             market_regime=regime,
             upcoming_events=events,
         )
@@ -87,6 +82,17 @@ class MacroProvider:
         except Exception:
             log.warning("vix_fetch_error", exc_info=True)
             return None, "stable"
+
+    def _fetch_ten_year_yield(self) -> float | None:
+        """Fetch the 10-year Treasury yield from Yahoo Finance."""
+        try:
+            data = _yahoo_chart("%5ETNX", "5d", "1d")
+            closes = _extract_closes(data)
+            if closes:
+                return round(closes[-1], 2)
+        except Exception:
+            log.debug("ten_year_yield_fetch_failed", exc_info=True)
+        return None
 
     def _fetch_spy_trend(self) -> str:
         """Determine SPY trend relative to its recent moving average."""
@@ -169,6 +175,28 @@ def _determine_regime(vix_level: float | None) -> str:
 
 
 def _get_upcoming_events() -> list[str]:
-    """Return hardcoded upcoming economic events for the current month."""
-    current_month = date.today().month
-    return _UPCOMING_EVENTS_2026.get(current_month, [])
+    """Return approximate upcoming economic events.
+
+    Uses recurring patterns rather than hardcoded dates, so it works
+    across years without manual updates.
+    """
+    today = date.today()
+    events: list[str] = []
+
+    # Jobs report: first Friday of the month
+    first_day = today.replace(day=1)
+    # Monday=0 ... Friday=4; days until first Friday
+    days_to_friday = (4 - first_day.weekday()) % 7
+    first_friday = first_day.replace(day=1 + days_to_friday)
+    if first_friday >= today:
+        events.append(f"Jobs Report {first_friday.strftime('%b %d')}")
+
+    # CPI: typically around the 10th-14th
+    cpi_approx = today.replace(day=12)
+    if cpi_approx >= today:
+        events.append(f"CPI Release ~{cpi_approx.strftime('%b %d')}")
+
+    # Generic FOMC reminder (meets ~8x/year, roughly every 6 weeks)
+    events.append("FOMC (check schedule)")
+
+    return events

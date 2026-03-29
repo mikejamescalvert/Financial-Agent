@@ -18,10 +18,69 @@ log = structlog.get_logger()
 _FINNHUB_BASE = "https://finnhub.io/api/v1"
 
 _POSITIVE_WORDS: frozenset[str] = frozenset(
-    {"surge", "beat", "upgrade", "growth", "profit", "record", "breakout"}
+    {
+        "surge",
+        "surges",
+        "surging",
+        "beat",
+        "beats",
+        "upgrade",
+        "upgrades",
+        "growth",
+        "profit",
+        "profits",
+        "record",
+        "breakout",
+        "rally",
+        "rallies",
+        "soar",
+        "soars",
+        "gains",
+        "bullish",
+        "outperform",
+        "outperforms",
+        "raises",
+        "boost",
+        "boosted",
+        "jumps",
+        "strong",
+        "exceeds",
+        "tops",
+    }
 )
 _NEGATIVE_WORDS: frozenset[str] = frozenset(
-    {"miss", "downgrade", "decline", "loss", "cut", "warning", "crash"}
+    {
+        "miss",
+        "misses",
+        "downgrade",
+        "downgrades",
+        "decline",
+        "declines",
+        "loss",
+        "losses",
+        "cut",
+        "cuts",
+        "warning",
+        "warns",
+        "crash",
+        "crashes",
+        "plunge",
+        "plunges",
+        "falls",
+        "bearish",
+        "underperform",
+        "underperforms",
+        "lowers",
+        "slump",
+        "slumps",
+        "drops",
+        "weak",
+        "layoffs",
+        "recall",
+    }
+)
+_NEGATION_WORDS: frozenset[str] = frozenset(
+    {"not", "no", "never", "neither", "nor", "doesn't", "didn't", "won't", "isn't", "aren't"}
 )
 
 _MAX_SYMBOLS = 5
@@ -111,19 +170,27 @@ class NewsProvider:
 
 
 def _compute_headline_sentiment(headline: str) -> float:
-    """Compute a simple keyword-based sentiment score for a headline.
+    """Compute keyword-based sentiment with negation handling.
 
-    Returns a float in [-1.0, 1.0].
+    Returns a float in [-1.0, 1.0]. Negation words ("not", "no", etc.)
+    flip the polarity of the next sentiment word.
     """
     words = headline.lower().split()
     score = 0.0
+    negate = False
 
     for word in words:
-        # Strip punctuation for matching
         cleaned = word.strip(".,!?;:'\"()-")
+        if cleaned in _NEGATION_WORDS:
+            negate = True
+            continue
         if cleaned in _POSITIVE_WORDS:
-            score += 0.3
+            score += -0.3 if negate else 0.3
+            negate = False
         elif cleaned in _NEGATIVE_WORDS:
-            score -= 0.3
+            score += 0.3 if negate else -0.3
+            negate = False
+        else:
+            negate = False
 
     return max(-1.0, min(1.0, score))
